@@ -14,8 +14,8 @@ type RoutineData = { id: number; name: string; exercises: ExerciseData[]; };
 const generateId = () => Math.random().toString(36).substr(2, 9);
 
 const defaultSets = (metric: MetricType, numSets = 3): SetData[] => {
-  const sets: SetData[] = [{ id: `s_${generateId()}`, type: 'W', kg: '', reps: '', isCompleted: false }];
-  for(let i=1; i<=numSets; i++) sets.push({ id: `s_${generateId()}`, type: 'normal', kg: '', reps: '', isCompleted: false });
+  const sets: SetData[] = [{ id: `s_${generateId()}`, type: 'W' as const, kg: '', reps: '', isCompleted: false }];
+  for(let i=1; i<=numSets; i++) sets.push({ id: `s_${generateId()}`, type: 'normal' as const, kg: '', reps: '', isCompleted: false });
   return sets;
 };
 
@@ -203,7 +203,7 @@ export const GymEngine = () => {
   };
 
   const addSet = (rId: number, exId: string) => {
-    const next = routines.map(ro => ro.id !== rId ? ro : { ...ro, exercises: ro.exercises.map(ex => ex.id !== exId ? ex : { ...ex, sets: [...ex.sets, { id: `s_${generateId()}`, type: 'normal', kg: '', reps: '', isCompleted: false }] }) });
+    const next = routines.map(ro => ro.id !== rId ? ro : { ...ro, exercises: ro.exercises.map(ex => ex.id !== exId ? ex : { ...ex, sets: [...ex.sets, { id: `s_${generateId()}`, type: 'normal' as const, kg: '', reps: '', isCompleted: false }] }) });
     saveToLS(next);
   };
 
