@@ -10,6 +10,9 @@ const CATEGORIES: Recipe['category'][] = ['Desayuno', 'Almuerzo', 'Comida', 'Mer
 
 type WeeklyPlan = Record<DayOfWeek, Record<Recipe['category'], Recipe | null>>;
 
+const normalizeText = (str: string) => 
+  str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
 const initialPlan: WeeklyPlan = DAYS.reduce((acc, day) => {
   acc[day] = CATEGORIES.reduce((catAcc, cat) => {
     catAcc[cat] = null;
@@ -44,6 +47,10 @@ export const LazyChef = () => {
   const [suggestionSeeds, setSuggestionSeeds] = useState<Record<string, number>>(
     CATEGORIES.reduce((acc, cat) => ({...acc, [cat]: 0}), {})
   );
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activeRecipeIndex, setActiveRecipeIndex] = useState(0);
+  const [lastRecipeId, setLastRecipeId] = useState<string | null>(null);
 
   // Persistence
   useEffect(() => {
@@ -92,22 +99,50 @@ export const LazyChef = () => {
     setIsMoving(null);
   };
 
-  // SHUFFLE LOGIC
+  // SHUFFLE & SMART FILTER LOGIC
   const currentRecipes = useMemo(() => {
-    const pool = RECIPES.filter(r => r.category === selectedCategory);
+    const q = searchTerm.trim() ? normalizeText(searchTerm) : '';
+    
+    // Global search if query exists, otherwise filtered by category
+    let pool = q 
+      ? RECIPES.filter(r => 
+          normalizeText(r.name).includes(q) || 
+          r.tags.some(t => normalizeText(t).includes(q)) ||
+          r.ingredients.some(i => normalizeText(i.item).includes(q))
+        )
+      : RECIPES.filter(r => r.category === selectedCategory);
+
     // Use the seed to "shuffle"
-    const seed = suggestionSeeds[selectedCategory];
+    const seed = suggestionSeeds[selectedCategory] || 0;
     const shuffled = [...pool].sort((a, b) => {
-       const hashA = (a.id.length * (seed + 1)) % pool.length;
-       const hashB = (b.id.length * (seed + 1)) % pool.length;
+       const hashA = (a.id.length * (seed + 1)) % (pool.length || 1);
+       const hashB = (b.id.length * (seed + 1)) % (pool.length || 1);
        return hashA - hashB;
     });
-    return shuffled.slice(0, 6); // Show 6
-  }, [selectedCategory, suggestionSeeds]);
+
+    // If searching, show more results, otherwise slice for suggestions
+    const results = q ? shuffled : shuffled.slice(0, 6);
+    return results;
+  }, [selectedCategory, suggestionSeeds, searchTerm]);
 
   const handleShuffle = () => {
-    setSuggestionSeeds(p => ({ ...p, [selectedCategory]: p[selectedCategory] + 1 }));
+    setSuggestionSeeds(p => ({ ...p, [selectedCategory]: (p[selectedCategory] || 0) + 1 }));
+    
+    // Feature: Pick a new active recipe index that isn't the current one
+    if (currentRecipes.length > 1) {
+      let newIndex;
+      do {
+        newIndex = Math.floor(Math.random() * currentRecipes.length);
+      } while (currentRecipes[newIndex]?.id === lastRecipeId);
+      
+      setActiveRecipeIndex(newIndex);
+      setLastRecipeId(currentRecipes[newIndex]?.id);
+    }
   };
+
+  const featuredRecipe = useMemo(() => {
+    return currentRecipes[activeRecipeIndex] || currentRecipes[0];
+  }, [currentRecipes, activeRecipeIndex]);
 
   // SHOPPING LIST LOGIC
   const shoppingList = useMemo(() => {
@@ -172,6 +207,41 @@ export const LazyChef = () => {
         </div>
       </div>
 
+      {/* --- ASSISTANT: SMART SEARCH --- */}
+      {activeTab === 'recetario' && (
+        <div className="max-w-xl mx-auto mb-16 px-4 animate-in fade-in zoom-in duration-700">
+           <div className="relative group">
+              {/* Glassmorphism Input Container */}
+              <div className="absolute -inset-1 bg-gradient-to-r from-[#D5CEA3]/20 via-[#BDAA7A]/20 to-[#392A1D]/20 rounded-[30px] blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+              
+              <div className="relative bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-[28px] p-1.5 flex items-center shadow-2xl overflow-hidden hover:border-[#D5CEA3]/30 transition-all">
+                 <div className="pl-6 text-[#D5CEA3]/40">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                 </div>
+                 <input 
+                   type="text" 
+                   value={searchTerm}
+                   onChange={(e) => setSearchTerm(e.target.value)}
+                   placeholder="¿Qué te apetece hoy? (ej: salmon, proteica, salmorejo)"
+                   className="w-full bg-transparent border-none focus:ring-0 text-lg py-5 px-6 placeholder-white/20 text-[#D5CEA3] font-medium selection:bg-[#D5CEA3]/30"
+                 />
+                 {searchTerm && (
+                   <button onClick={() => setSearchTerm('')} className="pr-6 text-white/20 hover:text-white transition-colors">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                   </button>
+                 )}
+              </div>
+              
+              {/* Search Badge Counter */}
+              {searchTerm && currentRecipes.length > 0 && (
+                <div className="absolute -bottom-3 right-8 bg-[#D5CEA3] text-[#1A120B] px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg">
+                  {currentRecipes.length} resultados
+                </div>
+              )}
+           </div>
+        </div>
+      )}
+
       {/* --- CONTENT: RECETARIO --- */}
       {activeTab === 'recetario' && (
         <div className="animate-in fade-in slide-in-from-bottom-3 duration-500">
@@ -195,9 +265,27 @@ export const LazyChef = () => {
               <span className="group-hover:rotate-180 transition-transform duration-500">🔄</span> Sugerencias
             </button>
           </div>
+          
+          {/* FEATURED RECIPE SECTION */}
+          {!searchTerm && featuredRecipe && (
+            <div className="mb-12 animate-in fade-in slide-in-from-top-4 duration-1000">
+              <div className="flex items-center gap-3 mb-4 px-2">
+                <div className="h-px flex-1 bg-gradient-to-r from-transparent to-[#D5CEA3]/20"></div>
+                <span className="text-[10px] font-black uppercase tracking-[0.4em] text-[#D5CEA3]">Sugerencia de hoy</span>
+                <div className="h-px flex-1 bg-gradient-to-l from-transparent to-[#D5CEA3]/20"></div>
+              </div>
+              <div className="max-w-2xl mx-auto">
+                <RecipeCard 
+                  recipe={featuredRecipe} 
+                  onAssign={() => setIsAssigning(featuredRecipe)} 
+                  featured
+                />
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {currentRecipes.map(recipe => (
+            {currentRecipes.filter(r => !featuredRecipe || r.id !== featuredRecipe.id || searchTerm).map(recipe => (
               <RecipeCard 
                 key={recipe.id} 
                 recipe={recipe} 
@@ -205,6 +293,14 @@ export const LazyChef = () => {
               />
             ))}
           </div>
+
+          {currentRecipes.length === 0 && (
+            <div className="py-20 text-center border-2 border-dashed border-white/5 rounded-[40px] animate-in fade-in zoom-in duration-500">
+               <div className="text-4xl mb-4">👨‍🍳🔎</div>
+               <p className="text-xl font-bold text-[#D5CEA3] mb-2">¡Vaya! Parece que el chef aún no tiene esa receta</p>
+               <p className="text-sm text-white/30 uppercase tracking-[0.2em]">¿Quieres probar con otra cosa?</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -413,49 +509,94 @@ export const LazyChef = () => {
   );
 };
 
-// --- SUB-COMPONENT: RECIPE CARD ---
-const RecipeCard = ({ recipe, onAssign }: { recipe: Recipe, onAssign: () => void }) => {
+const RecipeCard = ({ recipe, onAssign, featured }: { recipe: Recipe, onAssign: () => void, featured?: boolean }) => {
   const [showSteps, setShowSteps] = useState(false);
 
+  const categoryLabel = recipe.category.toUpperCase();
+
   return (
-    <div className={`bg-[#27211B] border border-white/5 p-6 rounded-[35px] hover:border-[#D5CEA3]/30 transition-all duration-300 relative overflow-hidden group flex flex-col h-full ${showSteps ? 'ring-2 ring-[#D5CEA3]/20' : ''}`}>
-      {/* Time Tag */}
-      <div className="absolute top-6 right-6 flex items-center gap-1.5 bg-black/40 px-3 py-1.5 rounded-full border border-white/5">
-        <span className="text-[9px] font-black uppercase tracking-widest text-[#D5CEA3]/60">{recipe.time}</span>
+    <div className={`bg-[#27211B] border border-white/5 p-6 rounded-[35px] hover:border-[#D5CEA3]/30 transition-all duration-300 relative overflow-hidden group flex flex-col h-full ${showSteps ? 'ring-2 ring-[#D5CEA3]/20' : ''} ${featured ? 'border-[#D5CEA3]/40 shadow-[0_0_40px_rgba(213,206,163,0.1)]' : ''}`}>
+      
+      {/* Top Bar: Category & Time */}
+      <div className="flex justify-between items-start mb-6">
+        <div className={`px-2.5 py-1 rounded-lg border border-white/5 bg-white/5 text-[8px] font-black tracking-[0.2em] text-[#D5CEA3]/60`}>
+          {categoryLabel}
+        </div>
+        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/5 ${featured ? 'bg-[#D5CEA3] text-[#1A120B]' : 'bg-black/40'}`}>
+          <span className={`text-[9px] font-black uppercase tracking-widest ${featured ? 'text-[#1A120B]' : 'text-[#D5CEA3]/60'}`}>{recipe.time}</span>
+        </div>
       </div>
 
+      {featured && (
+        <div className="absolute -left-12 top-10 -rotate-45 bg-[#D5CEA3] text-[#1A120B] py-1 px-12 text-[8px] font-black uppercase tracking-widest shadow-xl">
+          Destacado
+        </div>
+      )}
+
       <div className="mb-6">
-        <h3 className="text-2xl font-black text-white group-hover:text-[#D5CEA3] transition-colors leading-tight mb-2 pr-12">{recipe.name}</h3>
-        <span className="text-[9px] font-black uppercase tracking-[0.3em] text-white/20">0% Pescado • Nutrición Bio</span>
+        <h3 className="text-2xl font-black text-white group-hover:text-[#D5CEA3] transition-colors leading-tight mb-3">{recipe.name}</h3>
+        
+        {/* PILLS / TAGS */}
+        <div className="flex flex-wrap gap-1.5 mb-1">
+          <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white/20 border border-white/5 px-2 py-1 rounded-md">0% Pescado</span>
+          {recipe.tags?.map(tag => (
+            <span key={tag} className="text-[8px] font-black uppercase tracking-[0.15em] text-[#D5CEA3] bg-[#D5CEA3]/5 border border-[#D5CEA3]/10 px-2 py-1 rounded-md">
+              {tag}
+            </span>
+          ))}
+        </div>
       </div>
 
       <div className="flex-1 space-y-6">
         <div>
-           <div className="flex justify-between items-center mb-3">
-             <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-[#D5CEA3]/40">Ingredientes</h4>
-             <button onClick={() => setShowSteps(!showSteps)} className="text-[9px] font-black uppercase text-[#D5CEA3] hover:underline underline-offset-4 decoration-2">
-               {showSteps ? '← Ver Ingredientes' : 'Ver Receta →'}
+           <div className="flex justify-between items-center mb-4 pb-2 border-b border-white/5">
+             <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-[#D5CEA3]/40">
+               {showSteps ? 'Escuela de Cocina' : 'Ingredientes'}
+             </h4>
+             <button onClick={() => setShowSteps(!showSteps)} className="text-[9px] font-black uppercase text-[#D5CEA3] hover:scale-105 transition-transform flex items-center gap-2">
+               {showSteps ? (
+                 <>
+                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" /></svg>
+                   Ingredientes
+                 </>
+               ) : (
+                 <>
+                   Ver Receta
+                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M9 5l7 7-7 7" /></svg>
+                 </>
+               )}
              </button>
            </div>
            
            {!showSteps ? (
-             <div className="flex flex-wrap gap-2">
+             <div className="flex flex-wrap gap-2 animate-in fade-in duration-500">
                {recipe.ingredients.map((ing, i) => (
-                 <div key={i} className="text-[11px] font-bold bg-black/20 border border-white/5 px-2.5 py-1.5 rounded-xl text-white/70">
-                   {ing.item} <span className="text-[#D5CEA3]/50 ml-1">{ing.amount}</span>
+                 <div key={i} className="text-[11px] font-bold bg-black/20 border border-white/5 px-3 py-2 rounded-xl text-white/70 hover:border-[#D5CEA3]/20 transition-all">
+                   {ing.item} <span className="text-[#D5CEA3]/50 ml-1 font-mono">{ing.amount}</span>
                  </div>
                ))}
              </div>
            ) : (
-             <div className="space-y-4 animate-in slide-in-from-right-2 duration-300">
-                {recipe.instructions.map((step, i) => (
-                  <div key={i} className="flex gap-4 items-start py-1">
-                    <div className="w-5 h-5 rounded-lg bg-[#D5CEA3] text-[#1A120B] flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">
-                      {i + 1}
+             <div className="space-y-6 animate-in slide-in-from-right-4 duration-500">
+                <div className="space-y-4">
+                  {recipe.instructions.map((step, i) => (
+                    <div key={i} className="flex gap-4 items-start group/step">
+                      <div className="w-6 h-6 rounded-lg bg-[#D5CEA3]/10 text-[#D5CEA3] flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5 border border-[#D5CEA3]/20 group-hover/step:bg-[#D5CEA3] group-hover/step:text-[#1A120B] transition-all">
+                        {i + 1}
+                      </div>
+                      <p className="text-[13px] font-medium text-white/80 leading-relaxed italic">{step.replace(/^\d+\.\s*/, '')}</p>
                     </div>
-                    <p className="text-[13px] font-medium text-white/90 leading-relaxed italic">{step.replace(/^\d+\.\s*/, '')}</p>
+                  ))}
+                </div>
+
+                {/* CHEF TIP */}
+                {recipe.chefTip && (
+                  <div className="mt-8 p-4 bg-[#D5CEA3]/5 border-l-2 border-[#D5CEA3] rounded-r-2xl relative overflow-hidden group/tip">
+                    <div className="absolute -right-4 -top-4 text-4xl opacity-5 group-hover/tip:scale-110 transition-transform">👨‍🍳</div>
+                    <span className="text-[9px] font-black uppercase tracking-[0.3em] text-[#D5CEA3] block mb-2">Chef Tip</span>
+                    <p className="text-[12px] text-[#D5CEA3]/80 italic leading-relaxed">"{recipe.chefTip}"</p>
                   </div>
-                ))}
+                )}
              </div>
            )}
         </div>
