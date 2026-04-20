@@ -661,46 +661,57 @@ export const GymEngine = () => {
         </div>
       )}
 
-      {/* CONFETI FINAL Y BARRA INFERIOR */}
+      {/* BARRA INFERIOR: FINALIZAR ENTRENAMIENTO */}
       {isTrainingStarted && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[#15100B] via-[#15100B] to-transparent z-[50] flex flex-col items-center gap-3 pointer-events-none pb-8 pt-20">
-          {/* Save status indicator */}
+        <div className="fixed bottom-0 left-0 right-0 z-[50] flex flex-col items-center gap-3 pb-8 pt-16 px-4 bg-gradient-to-t from-[#0d0906] via-[#15100B]/95 to-transparent pointer-events-none">
+
+          {/* Feedback: Éxito */}
           {saveStatus === 'success' && (
-            <div className="pointer-events-auto flex items-center gap-2 text-emerald-400 text-xs font-black uppercase tracking-widest bg-emerald-500/10 border border-emerald-500/30 px-4 py-2 rounded-full animate-in fade-in">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-              Guardado en la nube
+            <div className="pointer-events-auto flex items-center gap-2.5 text-emerald-400 text-xs font-black uppercase tracking-widest bg-emerald-500/10 border border-emerald-500/30 px-5 py-2.5 rounded-full animate-in fade-in slide-in-from-bottom-2 duration-500">
+              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+              </svg>
+              ¡Entrenamiento guardado en la nube!
             </div>
           )}
+
+          {/* Feedback: Error */}
           {saveStatus === 'error' && (
-            <div className="pointer-events-auto flex items-center gap-2 text-red-400 text-xs font-black uppercase tracking-widest bg-red-500/10 border border-red-500/30 px-4 py-2 rounded-full">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
-              Error al guardar
+            <div className="pointer-events-auto flex items-center gap-2.5 text-red-400 text-xs font-black uppercase tracking-widest bg-red-500/10 border border-red-500/30 px-5 py-2.5 rounded-full">
+              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Error al guardar. Inténtalo de nuevo.
             </div>
           )}
-           <button
-             id="btn-finalizar-entrenamiento"
-             onClick={handleFinishTraining}
-             disabled={(!allSetsCompleted && !showConfetti) || isSaving}
-             className={`pointer-events-auto px-10 py-5 rounded-full font-black text-sm sm:text-base uppercase tracking-[0.2em] transition-all duration-700 flex items-center justify-center gap-3 w-full max-w-sm ${
-               allSetsCompleted
-                 ? isSaving
-                   ? 'bg-blue-800 text-white/50 opacity-80 cursor-wait'
-                   : 'bg-blue-600 text-white shadow-[0_10px_40px_rgba(37,99,235,0.4)] hover:scale-[1.03] opacity-100 translate-y-0'
-                 : 'bg-[#27211B] border border-white/5 text-white/20 translate-y-12 opacity-0'
-             }`}
-           >
+
+          {/* Botón principal */}
+          <button
+            id="btn-finalizar-entrenamiento"
+            onClick={handleFinishTraining}
+            disabled={isSaving}
+            className={`pointer-events-auto w-full max-w-sm px-10 py-5 rounded-full font-black text-base uppercase tracking-[0.2em] flex items-center justify-center gap-3 transition-all duration-300 shadow-[0_10px_40px_rgba(37,99,235,0.35)] hover:scale-[1.03] active:scale-95 ${
+              isSaving
+                ? 'bg-blue-800 text-white/50 cursor-wait'
+                : 'bg-blue-600 text-white hover:bg-blue-500'
+            }`}
+          >
             {isSaving ? (
               <>
-                <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                GUARDANDO...
+                <svg className="w-5 h-5 animate-spin shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Guardando en la nube...
               </>
             ) : (
               <>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                FINALIZAR RITUAL
+                <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Finalizar y Guardar
               </>
             )}
-           </button>
+          </button>
         </div>
       )}
     </div>
