@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { GLOBAL_LIBRARY, ExerciseGuide, MuscleFilter, ExerciseCategory } from '../../data/exercisesLibrary';
+import { supabase } from '../../lib/supabaseClient';
 
 // --- TYPES ---
 type MetricType = 'kg_reps' | 'time' | 'reps_only';
@@ -126,6 +127,8 @@ export const GymEngine = () => {
   const [sessionSecs, setSessionSecs] = useState(0);
   const [restTimer, setRestTimer] = useState({ active: false, remaining: 0, total: 0 });
   const [showConfetti, setShowConfetti] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   
   // EXPANDED UI
   const [expandedGuides, setExpandedGuides] = useState<Record<string, boolean>>({});
@@ -250,11 +253,44 @@ export const GymEngine = () => {
     if (!expandedGuides[exId]) setGuideTabs(p => ({ ...p, [exId]: 'how' }));
   };
 
-  const handleFinishTraining = () => {
+  const handleFinishTraining = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+    setSaveStatus('saving');
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    setShowConfetti(true);
     setRestTimer({ active: false, remaining: 0, total: 0 });
-    setTimeout(() => { setShowConfetti(false); setIsTrainingStarted(false); setSessionSecs(0); }, 5000);
+
+    // Build the workout record to save
+    const workoutRecord = {
+      id: `workout_${Date.now()}`,
+      routine_name: activeRoutine?.name || 'Sesión',
+      duration: formatStopwatch(sessionSecs),
+      exercises: activeRoutine?.exercises.map(ex => ({
+        name: ex.name,
+        sets: ex.sets
+          .filter(s => s.isCompleted)
+          .map(s => ({ kg: s.kg, reps: s.reps, type: s.type }))
+      })) || [],
+    };
+
+    try {
+      const { error } = await supabase.from('workouts').insert(workoutRecord);
+      if (error) throw error;
+      setSaveStatus('success');
+      console.log('💪 Entrenamiento guardado en Supabase:', workoutRecord.routine_name);
+    } catch (err) {
+      console.error('❌ Error guardando entrenamiento:', err);
+      setSaveStatus('error');
+    } finally {
+      setIsSaving(false);
+      setShowConfetti(true);
+      setTimeout(() => {
+        setShowConfetti(false);
+        setIsTrainingStarted(false);
+        setSessionSecs(0);
+        setSaveStatus('idle');
+      }, 5000);
+    }
   };
 
   // LIBRERÍA DE BÚSQUEDA DINÁMICA
@@ -627,9 +663,43 @@ export const GymEngine = () => {
 
       {/* CONFETI FINAL Y BARRA INFERIOR */}
       {isTrainingStarted && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[#15100B] via-[#15100B] to-transparent z-[50] flex justify-center pointer-events-none pb-8 pt-20">
-           <button onClick={handleFinishTraining} disabled={!allSetsCompleted && !showConfetti} className={`pointer-events-auto px-10 py-5 rounded-full font-black text-sm sm:text-base uppercase tracking-[0.2em] transition-all duration-700 flex items-center justify-center gap-3 w-full max-w-sm ${allSetsCompleted ? 'bg-blue-600 text-white shadow-[0_10px_40px_rgba(37,99,235,0.4)] hover:scale-[1.03] opacity-100 translate-y-0' : 'bg-[#27211B] border border-white/5 text-white/20 translate-y-12 opacity-0'}`}>
-             FINALIZAR RITUAL
+        <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[#15100B] via-[#15100B] to-transparent z-[50] flex flex-col items-center gap-3 pointer-events-none pb-8 pt-20">
+          {/* Save status indicator */}
+          {saveStatus === 'success' && (
+            <div className="pointer-events-auto flex items-center gap-2 text-emerald-400 text-xs font-black uppercase tracking-widest bg-emerald-500/10 border border-emerald-500/30 px-4 py-2 rounded-full animate-in fade-in">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+              Guardado en la nube
+            </div>
+          )}
+          {saveStatus === 'error' && (
+            <div className="pointer-events-auto flex items-center gap-2 text-red-400 text-xs font-black uppercase tracking-widest bg-red-500/10 border border-red-500/30 px-4 py-2 rounded-full">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+              Error al guardar
+            </div>
+          )}
+           <button
+             id="btn-finalizar-entrenamiento"
+             onClick={handleFinishTraining}
+             disabled={(!allSetsCompleted && !showConfetti) || isSaving}
+             className={`pointer-events-auto px-10 py-5 rounded-full font-black text-sm sm:text-base uppercase tracking-[0.2em] transition-all duration-700 flex items-center justify-center gap-3 w-full max-w-sm ${
+               allSetsCompleted
+                 ? isSaving
+                   ? 'bg-blue-800 text-white/50 opacity-80 cursor-wait'
+                   : 'bg-blue-600 text-white shadow-[0_10px_40px_rgba(37,99,235,0.4)] hover:scale-[1.03] opacity-100 translate-y-0'
+                 : 'bg-[#27211B] border border-white/5 text-white/20 translate-y-12 opacity-0'
+             }`}
+           >
+            {isSaving ? (
+              <>
+                <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                GUARDANDO...
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                FINALIZAR RITUAL
+              </>
+            )}
            </button>
         </div>
       )}
