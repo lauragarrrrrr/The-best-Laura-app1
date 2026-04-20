@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { RECIPES, Recipe } from '../../data/recipesLibrary';
+import { supabase } from '../../lib/supabaseClient';
 
 // --- TYPES & CONSTANTS ---
 type DayOfWeek = 'Lunes' | 'Martes' | 'Miércoles' | 'Jueves' | 'Viernes' | 'Sábado' | 'Domingo';
@@ -51,6 +52,36 @@ export const LazyChef = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeRecipeIndex, setActiveRecipeIndex] = useState(0);
   const [lastRecipeId, setLastRecipeId] = useState<string | null>(null);
+  const [allRecipes, setAllRecipes] = useState<Recipe[]>(RECIPES);
+  const [dataSource, setDataSource] = useState<'local' | 'supabase'>('local');
+
+  // Supabase Data Fetching
+  useEffect(() => {
+    const fetchRecipes = async () => {
+      try {
+        console.log('📡 Intentando conectar con Supabase...');
+        const { data, error } = await supabase
+          .from('recipes')
+          .select('*');
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          console.log('✅ Datos recuperados de Supabase:', data.length, 'recetas');
+          setAllRecipes(data as Recipe[]);
+          setDataSource('supabase');
+        } else {
+          console.warn('⚠️ La tabla "recipes" está vacía. Usando fallback local.');
+          setDataSource('local');
+        }
+      } catch (err) {
+        console.error('❌ Error conectando con Supabase. Usando fallback local:', err);
+        setDataSource('local');
+      }
+    };
+
+    fetchRecipes();
+  }, []);
 
   // Persistence
   useEffect(() => {
@@ -105,12 +136,12 @@ export const LazyChef = () => {
     
     // Global search if query exists, otherwise filtered by category
     let pool = q 
-      ? RECIPES.filter(r => 
+      ? allRecipes.filter(r => 
           normalizeText(r.name).includes(q) || 
           r.tags.some(t => normalizeText(t).includes(q)) ||
           r.ingredients.some(i => normalizeText(i.item).includes(q))
         )
-      : RECIPES.filter(r => r.category === selectedCategory);
+      : allRecipes.filter(r => r.category === selectedCategory);
 
     // Use the seed to "shuffle"
     const seed = suggestionSeeds[selectedCategory] || 0;
@@ -210,6 +241,13 @@ export const LazyChef = () => {
       {/* --- ASSISTANT: SMART SEARCH --- */}
       {activeTab === 'recetario' && (
         <div className="max-w-xl mx-auto mb-16 px-4 animate-in fade-in zoom-in duration-700">
+           {/* Data Source Indicator */}
+           <div className="flex justify-center mb-4">
+              <div className={`text-[9px] font-black uppercase tracking-[0.3em] px-3 py-1 rounded-full border ${dataSource === 'supabase' ? 'border-green-500/30 text-green-500 bg-green-500/5' : 'border-[#D5CEA3]/20 text-[#D5CEA3]/40 bg-white/5'}`}>
+                Engine: {dataSource === 'supabase' ? 'Cloud Persistence (Supabase)' : 'Static Fallback (Local)'}
+              </div>
+           </div>
+
            <div className="relative group">
               {/* Glassmorphism Input Container */}
               <div className="absolute -inset-1 bg-gradient-to-r from-[#D5CEA3]/20 via-[#BDAA7A]/20 to-[#392A1D]/20 rounded-[30px] blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
@@ -579,7 +617,7 @@ const RecipeCard = ({ recipe, onAssign, featured }: { recipe: Recipe, onAssign: 
            ) : (
              <div className="space-y-6 animate-in slide-in-from-right-4 duration-500">
                 <div className="space-y-4">
-                  {recipe.instructions.map((step, i) => (
+                  {recipe.steps.map((step, i) => (
                     <div key={i} className="flex gap-4 items-start group/step">
                       <div className="w-6 h-6 rounded-lg bg-[#D5CEA3]/10 text-[#D5CEA3] flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5 border border-[#D5CEA3]/20 group-hover/step:bg-[#D5CEA3] group-hover/step:text-[#1A120B] transition-all">
                         {i + 1}
@@ -590,11 +628,11 @@ const RecipeCard = ({ recipe, onAssign, featured }: { recipe: Recipe, onAssign: 
                 </div>
 
                 {/* CHEF TIP */}
-                {recipe.chefTip && (
+                {recipe.cheftip && (
                   <div className="mt-8 p-4 bg-[#D5CEA3]/5 border-l-2 border-[#D5CEA3] rounded-r-2xl relative overflow-hidden group/tip">
                     <div className="absolute -right-4 -top-4 text-4xl opacity-5 group-hover/tip:scale-110 transition-transform">👨‍🍳</div>
                     <span className="text-[9px] font-black uppercase tracking-[0.3em] text-[#D5CEA3] block mb-2">Chef Tip</span>
-                    <p className="text-[12px] text-[#D5CEA3]/80 italic leading-relaxed">"{recipe.chefTip}"</p>
+                    <p className="text-[12px] text-[#D5CEA3]/80 italic leading-relaxed">"{recipe.cheftip}"</p>
                   </div>
                 )}
              </div>
