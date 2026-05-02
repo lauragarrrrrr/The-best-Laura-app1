@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { useHasHydrated } from '../../lib/useHasHydrated';
 import { GLOBAL_LIBRARY, ExerciseGuide, MuscleFilter, ExerciseCategory } from '../../data/exercisesLibrary';
 import { supabase } from '../../lib/supabaseClient';
 
@@ -120,6 +121,7 @@ const getRoutineThemeColor = (id: number) => {
 };
 
 export const GymEngine = () => {
+  const hasHydrated = useHasHydrated();
   // STATE SYNC
   const [routines, setRoutines] = useState<RoutineData[]>([]);
   const [selectedDayId, setSelectedDayId] = useState(1);
@@ -236,7 +238,7 @@ export const GymEngine = () => {
     return sets.length > 0 && sets.every(s => s.isCompleted);
   }, [activeRoutine]);
 
-  if (routines.length === 0 || !activeRoutine) return null; // Hydration guard
+  if (!hasHydrated || routines.length === 0 || !activeRoutine) return null;
 
   // DATA HANDLERS
   const handleUpdateSet = (rId: number, exId: string, setId: string, field: 'kg' | 'reps', val: string) => {

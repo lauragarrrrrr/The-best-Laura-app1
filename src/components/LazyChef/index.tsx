@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useHasHydrated } from '../../lib/useHasHydrated';
 import { RECIPES, Recipe } from '../../data/recipesLibrary';
 import { supabase } from '../../lib/supabaseClient';
 
@@ -39,10 +40,10 @@ const MEAL_TAG_COLORS: Record<Recipe['category'], string> = {
 };
 
 export const LazyChef = () => {
+  const hasHydrated = useHasHydrated();
   const [activeTab, setActiveTab] = useState<'recetario' | 'planificador'>('recetario');
   const [selectedCategory, setSelectedCategory] = useState<Recipe['category']>('Comida');
   const [weeklyPlan, setWeeklyPlan] = useState<WeeklyPlan>(initialPlan);
-  const [isHydrated, setIsHydrated] = useState(false);
   
   // Suggestion randomness
   const [suggestionSeeds, setSuggestionSeeds] = useState<Record<string, number>>(
@@ -93,7 +94,6 @@ export const LazyChef = () => {
         console.error("Error loading plan", e);
       }
     }
-    setIsHydrated(true);
   }, []);
 
   const savePlan = (plan: WeeklyPlan) => {
@@ -202,7 +202,7 @@ export const LazyChef = () => {
     };
   }, [weeklyPlan]);
 
-  if (!isHydrated) return null;
+  if (!hasHydrated) return null;
 
   return (
     <div className="bg-[#1A120B] text-[#F5F5F5] font-sans p-2 sm:p-6 rounded-3xl border border-[#D5CEA3]/10 shadow-[0_20px_60px_rgba(0,0,0,0.6)] relative">

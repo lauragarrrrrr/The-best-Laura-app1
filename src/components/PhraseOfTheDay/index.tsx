@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
+import { useHasHydrated } from '../../lib/useHasHydrated';
 
 const phrases = [
   "Tu cuerpo es tu templo, biohackea su potencial.",
@@ -12,6 +13,7 @@ const phrases = [
 ];
 
 export const PhraseOfTheDay = () => {
+  const hasHydrated = useHasHydrated();
   const [phrase, setPhrase] = useState("");
 
   useEffect(() => {
@@ -26,7 +28,7 @@ export const PhraseOfTheDay = () => {
     setPhrase(phrases[index]);
   }, []);
 
-  if (!phrase) return null;
+  if (!hasHydrated || !phrase) return null;
 
   return (
     <div className="bg-card/40 border-l-4 border-accent p-5 rounded-r-lg mb-8 shadow-md transition-all hover:bg-card/60">
