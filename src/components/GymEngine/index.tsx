@@ -129,6 +129,19 @@ export const GymEngine = () => {
   const [showConfetti, setShowConfetti] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+
+  // SUPABASE LIVE DATA
+  const [exercisePRs, setExercisePRs] = useState<Record<string, string>>({});
+  const [workoutHistory, setWorkoutHistory] = useState<Array<{id: string; created_at: string; routine_name: string; duration: string}>>([]);
+  const [showHistory, setShowHistory] = useState(false);
+
+  // VIDEO UPLOAD + AI FEEDBACK
+  const [videoModal, setVideoModal] = useState<{open: boolean; exerciseName: string; exerciseId: string}>({ open: false, exerciseName: '', exerciseId: '' });
+  const [isUploading, setIsUploading] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  type FeedbackPoint = { estado: 'bien' | 'mejorar'; texto: string };
+  type AIFeedback = { postura: FeedbackPoint; rango: FeedbackPoint; estabilidad: FeedbackPoint; mensaje_general: string };
+  const [aiFeedback, setAiFeedback] = useState<AIFeedback | null>(null);
   
   // EXPANDED UI
   const [expandedGuides, setExpandedGuides] = useState<Record<string, boolean>>({});
@@ -170,6 +183,42 @@ export const GymEngine = () => {
     } else if (restTimer.remaining === 0) setRestTimer(p => ({ ...p, active: false }));
     return () => clearInterval(interval);
   }, [restTimer.active, restTimer.remaining]);
+
+  // Fetch PRs for the selected routine from Supabase
+  useEffect(() => {
+    const routineName = routines.find(r => r.id === selectedDayId)?.name;
+    if (!routineName) return;
+    const run = async () => {
+      const { data } = await supabase
+        .from('workouts')
+        .select('exercises')
+        .eq('routine_name', routineName)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      if (data?.[0]?.exercises) {
+        const prs: Record<string, string> = {};
+        (data[0].exercises as any[]).forEach((ex: any) => {
+          const done = ex.sets?.filter((s: any) => s.type !== 'W' && s.kg && s.reps);
+          if (done?.length) prs[ex.name] = `${done[0].kg}kg × ${done[0].reps}`;
+        });
+        setExercisePRs(prs);
+      }
+    };
+    run();
+  }, [selectedDayId, routines.length]); // eslint-disable-line
+
+  // Fetch full workout history
+  useEffect(() => {
+    const run = async () => {
+      const { data } = await supabase
+        .from('workouts')
+        .select('id, created_at, routine_name, duration')
+        .order('created_at', { ascending: false })
+        .limit(30);
+      if (data) setWorkoutHistory(data);
+    };
+    run();
+  }, []);
 
   const activeRoutine = useMemo(() => routines.find(r => r.id === selectedDayId) || null, [routines, selectedDayId]);
   
@@ -248,10 +297,46 @@ export const GymEngine = () => {
   };
 
   const toggleGuide = (exId: string, e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('button.editor-trash') || (e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).closest('button.editor-arrow')) return;
+    if ((e.target as HTMLElement).closest('button.editor-trash') || (e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).closest('button.editor-arrow') || (e.target as HTMLElement).closest('button.video-btn')) return;
     setExpandedGuides(p => ({ ...p, [exId]: !p[exId] }));
     if (!expandedGuides[exId]) setGuideTabs(p => ({ ...p, [exId]: 'how' }));
   };
+
+  const handleVideoUpload = async (file: File) => {
+    if (!file || !videoModal.exerciseId) return;
+    setIsUploading(true);
+    setAiFeedback(null);
+    try {
+      const ext = file.name.split('.').pop() || 'mp4';
+      const path = `${videoModal.exerciseId}_${Date.now()}.${ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from('exercise-videos')
+        .upload(path, file, { contentType: file.type, upsert: true });
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage.from('exercise-videos').getPublicUrl(path);
+
+      setIsUploading(false);
+      setIsAnalyzing(true);
+
+      // Call Gemini AI
+      const res = await fetch('/api/analyze-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoUrl: publicUrl, exerciseName: videoModal.exerciseName }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error);
+      setAiFeedback(data.feedback);
+    } catch (err: any) {
+      alert(`❌ Error: ${err.message}`);
+    } finally {
+      setIsUploading(false);
+      setIsAnalyzing(false);
+    }
+  };
+
 
   const handleFinishTraining = async () => {
     if (isSaving) return;
@@ -277,6 +362,7 @@ export const GymEngine = () => {
       const { error } = await supabase.from('workouts').insert(workoutRecord);
       if (error) throw error;
       setSaveStatus('success');
+      setWorkoutHistory(prev => [{ id: workoutRecord.id, created_at: new Date().toISOString(), routine_name: workoutRecord.routine_name, duration: workoutRecord.duration }, ...prev.slice(0, 29)]);
       console.log('💪 Entrenamiento guardado en Supabase:', workoutRecord.routine_name);
     } catch (err) {
       console.error('❌ Error guardando entrenamiento:', err);
@@ -326,25 +412,73 @@ export const GymEngine = () => {
       ) : (
         <div className="p-4 flex flex-col items-center text-center">
            <h2 className="text-accent text-3xl font-extrabold tracking-widest uppercase mb-1">The best Laura</h2>
-           <p className="text-foreground/40 text-[10px] uppercase font-bold tracking-[0.3em] mb-6">ARCHIT. ROUTINE EDITOR</p>
-           <div className="flex flex-wrap gap-2 sm:gap-3 justify-center mt-2 max-w-2xl px-2">
-             {routines.map((d) => {
-               const shortName = getRoutineShortName(d.name);
-               const isSelected = selectedDayId === d.id;
-               return (
-                 <button key={d.id} onClick={() => setSelectedDayId(d.id)} className={`text-xs px-4 py-2.5 rounded-xl font-bold transition-all tracking-[0.15em] flex items-center shadow-sm ${
-                   isSelected ? 'bg-accent text-[#15100B] scale-110 shadow-[0_0_15px_rgba(213,206,163,0.4)]' : 'bg-[#27211B] text-foreground/70 hover:bg-[#392A1D] hover:text-accent border border-white/5'
-                 }`}>
-                   {shortName}
-                 </button>
-               );
-             })}
+           <p className="text-foreground/40 text-[10px] uppercase font-bold tracking-[0.3em] mb-4">ARCHIT. ROUTINE EDITOR</p>
+           {/* Tabs: Rutinas | Historia */}
+           <div className="flex gap-2 mb-4 p-1 bg-black/30 rounded-xl border border-white/5">
+             <button onClick={() => setShowHistory(false)} className={`px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${ !showHistory ? 'bg-accent text-[#1A120B]' : 'text-white/40 hover:text-white'}`}>Rutinas</button>
+             <button onClick={() => setShowHistory(true)} className={`px-5 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 ${ showHistory ? 'bg-accent text-[#1A120B]' : 'text-white/40 hover:text-white'}`}>
+               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+               Historia ({workoutHistory.length})
+             </button>
            </div>
+           {!showHistory && (
+             <div className="flex flex-wrap gap-2 sm:gap-3 justify-center mt-2 max-w-2xl px-2">
+               {routines.map((d) => {
+                 const shortName = getRoutineShortName(d.name);
+                 const isSelected = selectedDayId === d.id;
+                 return (
+                   <button key={d.id} onClick={() => setSelectedDayId(d.id)} className={`text-xs px-4 py-2.5 rounded-xl font-bold transition-all tracking-[0.15em] flex items-center shadow-sm ${
+                     isSelected ? 'bg-accent text-[#15100B] scale-110 shadow-[0_0_15px_rgba(213,206,163,0.4)]' : 'bg-[#27211B] text-foreground/70 hover:bg-[#392A1D] hover:text-accent border border-white/5'
+                   }`}>
+                     {shortName}
+                   </button>
+                 );
+               })}
+             </div>
+           )}
+        </div>
+      )}
+
+      {/* PANEL: MI HISTORIA */}
+      {!isTrainingStarted && showHistory && (
+        <div className="px-4 py-6 max-w-3xl mx-auto space-y-4 animate-in fade-in slide-in-from-bottom-3 duration-500">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs font-black uppercase tracking-[0.4em] text-accent/60">Sesiones Registradas</h3>
+            <span className="text-[10px] font-bold text-white/20 bg-white/5 px-2 py-1 rounded tracking-widest">{workoutHistory.length} sesiones</span>
+          </div>
+          {workoutHistory.length === 0 ? (
+            <div className="py-20 text-center border-2 border-dashed border-white/5 rounded-3xl">
+              <p className="text-white/20 text-xs uppercase tracking-widest font-bold">Aún no hay sesiones guardadas</p>
+              <p className="text-white/10 text-[10px] mt-2">Completa tu primer entrenamiento para verlo aquí</p>
+            </div>
+          ) : (
+            workoutHistory.map((session) => {
+              const date = new Date(session.created_at);
+              const dateStr = date.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
+              const timeStr = date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+              return (
+                <div key={session.id} className="bg-[#27211B] border border-white/5 rounded-2xl p-5 flex items-center gap-5 hover:border-accent/20 transition-all group">
+                  <div className="w-12 h-12 rounded-xl bg-accent/10 border border-accent/20 flex flex-col items-center justify-center shrink-0">
+                    <span className="text-accent font-black text-sm leading-none">{date.getDate()}</span>
+                    <span className="text-accent/50 text-[9px] font-bold uppercase">{date.toLocaleDateString('es-ES', { month: 'short' })}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-extrabold text-white/90 text-sm truncate">{session.routine_name}</h4>
+                    <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest mt-1">{dateStr} · {timeStr}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-accent font-mono font-black text-base">{session.duration}</span>
+                    <p className="text-[9px] text-white/20 uppercase tracking-widest">duración</p>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       )}
 
       {/* DASHBOARD PREVIO (ESTADO DE EDICIÓN / DESCANSO) */}
-      {!isTrainingStarted ? (
+      {!isTrainingStarted && !showHistory ? (
         <div className="flex flex-col py-6 space-y-6 px-4 pb-20 max-w-3xl mx-auto">
           {/* HEADER VISUAL GLOW */}
           <div className={`w-full rounded-2xl p-0 shadow-xl flex flex-col mb-4 overflow-hidden border border-white/10 bg-[#27211B]`}>
@@ -440,11 +574,20 @@ export const GymEngine = () => {
                           </div>
                         </h3>
                         <div className="text-[10px] sm:text-[11px] font-bold text-accent/60 uppercase tracking-[0.2em] mt-1.5 flex gap-2 items-center">
-                          <span className="w-1.5 h-1.5 rounded-full bg-accent/40 block"></span> ANTERIOR: {historyMocks[0].data}
+                          <span className="w-1.5 h-1.5 rounded-full bg-accent/40 block"></span>
+                          {exercisePRs[exercise.name] ? `Anterior: ${exercisePRs[exercise.name]}` : 'Sin datos previos'}
                         </div>
-                      </div>
-                    </div>
-                  </div>
+                     </div>
+                     {/* VIDEO BUTTON */}
+                     <button
+                       className="video-btn shrink-0 w-9 h-9 rounded-xl bg-[#27211B] border border-white/10 flex items-center justify-center text-white/30 hover:text-accent hover:border-accent/30 transition-all"
+                       title="Grabar Técnica"
+                       onClick={(e) => { e.stopPropagation(); setVideoModal({ open: true, exerciseName: exercise.name, exerciseId: exercise.id }); }}
+                     >
+                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" /></svg>
+                     </button>
+                   </div>
+                 </div>
                 </div>
 
                 {/* MODAL EXPANDIDO (SIN IMAGENES, PURO TEXTO) */}
@@ -639,6 +782,119 @@ export const GymEngine = () => {
                  )}
               </div>
            </div>
+        </div>
+      )}
+
+      {/* OVERLAY: VIDEO MODAL */}
+      {videoModal.open && (
+        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center animate-in fade-in duration-200">
+          <div className="bg-[#1A120B] border border-accent/20 rounded-t-[30px] sm:rounded-[30px] p-6 w-full max-w-sm shadow-2xl max-h-[90vh] overflow-y-auto">
+
+            {/* Header */}
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h3 className="text-base font-black text-white tracking-tight">Análisis de Técnica</h3>
+                <p className="text-[11px] text-accent/60 font-bold uppercase tracking-widest mt-0.5 truncate max-w-[200px]">{videoModal.exerciseName}</p>
+              </div>
+              <button
+                onClick={() => { setVideoModal({ open: false, exerciseName: '', exerciseId: '' }); setAiFeedback(null); }}
+                className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-white/40 hover:text-white transition-colors shrink-0"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            {/* STATE: UPLOADING */}
+            {isUploading && (
+              <div className="py-10 flex flex-col items-center gap-4 animate-in fade-in">
+                <div className="w-14 h-14 rounded-full border-2 border-accent/30 border-t-accent animate-spin" />
+                <p className="text-accent/80 text-sm font-black uppercase tracking-widest">Subiendo vídeo...</p>
+              </div>
+            )}
+
+            {/* STATE: ANALYZING */}
+            {isAnalyzing && (
+              <div className="py-10 flex flex-col items-center gap-4 animate-in fade-in">
+                <div className="relative">
+                  <div className="w-14 h-14 rounded-full border-2 border-purple-500/30 border-t-purple-400 animate-spin" />
+                  <span className="absolute inset-0 flex items-center justify-center text-lg">✨</span>
+                </div>
+                <div className="text-center">
+                  <p className="text-purple-300 text-sm font-black uppercase tracking-widest">IA analizando tu técnica...</p>
+                  <p className="text-white/20 text-[10px] mt-1">Gemini Vision está revisando cada frame</p>
+                </div>
+              </div>
+            )}
+
+            {/* STATE: FEEDBACK RESULT */}
+            {aiFeedback && !isUploading && !isAnalyzing && (
+              <div className="space-y-3 animate-in fade-in slide-in-from-bottom-3 duration-500">
+                {/* Mensaje general */}
+                <div className="bg-purple-500/10 border border-purple-500/20 rounded-2xl p-4 mb-4">
+                  <div className="flex items-start gap-3">
+                    <span className="text-xl shrink-0">🤖</span>
+                    <p className="text-sm text-white/80 italic leading-relaxed">"{aiFeedback.mensaje_general}"</p>
+                  </div>
+                </div>
+
+                {/* 3 Puntos */}
+                {([
+                  { key: 'postura' as const, label: 'Postura', icon: '🧍' },
+                  { key: 'rango' as const, label: 'Rango de Movimiento', icon: '↔️' },
+                  { key: 'estabilidad' as const, label: 'Estabilidad', icon: '⚖️' },
+                ] as const).map(({ key, label, icon }) => {
+                  const point = aiFeedback[key];
+                  const isGood = point.estado === 'bien';
+                  return (
+                    <div
+                      key={key}
+                      className={`rounded-2xl p-4 border ${
+                        isGood
+                          ? 'bg-emerald-500/10 border-emerald-500/25'
+                          : 'bg-amber-500/10 border-amber-500/25'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="text-base">{icon}</span>
+                        <span className={`text-[10px] font-black uppercase tracking-widest ${ isGood ? 'text-emerald-400' : 'text-amber-400' }`}>{label}</span>
+                        <span className={`ml-auto text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${ isGood ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400' }`}>
+                          {isGood ? '✔ Bien' : '▲ Mejora'}
+                        </span>
+                      </div>
+                      <p className={`text-sm leading-relaxed ${ isGood ? 'text-emerald-100/80' : 'text-amber-100/80' }`}>{point.texto}</p>
+                    </div>
+                  );
+                })}
+
+                {/* Volver a grabar */}
+                <button
+                  onClick={() => setAiFeedback(null)}
+                  className="w-full mt-2 py-3 rounded-2xl border border-white/10 text-white/30 hover:text-white/60 hover:border-white/20 text-xs font-black uppercase tracking-widest transition-all"
+                >
+                  ↺ Grabar otro vídeo
+                </button>
+              </div>
+            )}
+
+            {/* STATE: DEFAULT — Upload options */}
+            {!isUploading && !isAnalyzing && !aiFeedback && (
+              <div className="space-y-3">
+                <label className="w-full flex items-center justify-center gap-3 py-5 rounded-2xl font-black text-sm uppercase tracking-widest border-2 border-dashed border-accent/30 text-accent/70 hover:border-accent hover:text-accent hover:bg-accent/5 transition-all cursor-pointer">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" /></svg>
+                  Grabar con Cámara
+                  <input type="file" accept="video/*" capture="user" className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleVideoUpload(f); }} />
+                </label>
+                <label className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl font-black text-xs uppercase tracking-widest border border-white/10 text-white/30 hover:text-white/60 hover:border-white/20 transition-all cursor-pointer">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                  Subir desde galeria
+                  <input type="file" accept="video/*" className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleVideoUpload(f); }} />
+                </label>
+                <p className="text-center text-[9px] text-white/15 uppercase tracking-widest pt-1">Máx. 15s · Gemini Vision analizará tu técnica</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
