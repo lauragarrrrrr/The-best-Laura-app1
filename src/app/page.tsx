@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { GymEngine } from "@/components/GymEngine";
-import { MuscleHeatmap } from "@/components/MuscleHeatmap";
 import { LazyChef } from "@/components/LazyChef";
 import { PhraseOfTheDay } from "@/components/PhraseOfTheDay";
 import { FeedbackPlaceholder } from "@/components/FeedbackPlaceholder";
@@ -10,7 +9,7 @@ import { FeedbackPlaceholder } from "@/components/FeedbackPlaceholder";
 export default function Home() {
   const [activeTab, setActiveTab] = useState('Trainings');
 
-  const tabs = ['Trainings', 'Food', 'Corporal Ranking', 'Feedback'];
+  const tabs = ['Trainings', 'Food', 'Feedback'];
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans p-4 md:p-8">
@@ -57,12 +56,6 @@ export default function Home() {
             </div>
           )}
 
-          {activeTab === 'Corporal Ranking' && (
-            <div className="space-y-8 max-w-2xl mx-auto">
-              {/* Added max-w-2xl for better visual balance since heatmap can be wide */}
-              <MuscleHeatmap />
-            </div>
-          )}
 
           {activeTab === 'Feedback' && (
             <div className="space-y-8">

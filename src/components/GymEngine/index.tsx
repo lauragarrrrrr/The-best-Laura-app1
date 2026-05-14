@@ -143,7 +143,8 @@ export const GymEngine = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   type FeedbackPoint = { estado: 'bien' | 'mejorar'; texto: string };
   type AIFeedback = { postura: FeedbackPoint; rango: FeedbackPoint; estabilidad: FeedbackPoint; mensaje_general: string };
-  const [aiFeedback, setAiFeedback] = useState<AIFeedback | null>(null);
+  const [aiFeedbackMap, setAiFeedbackMap] = useState<Record<string, AIFeedback>>({});
+  const [analyzingExId, setAnalyzingExId] = useState<string | null>(null);
   
   // EXPANDED UI
   const [expandedGuides, setExpandedGuides] = useState<Record<string, boolean>>({});
@@ -154,6 +155,8 @@ export const GymEngine = () => {
   const [libraryFilter, setLibraryFilter] = useState<MuscleFilter | 'Todos'>('Todos');
   const [searchQuery, setSearchQuery] = useState('');
   const [libraryPreview, setLibraryPreview] = useState<string | null>(null);
+  const [editorSearchQuery, setEditorSearchQuery] = useState('');
+  const [showEditorSearch, setShowEditorSearch] = useState(false);
 
   // INIT & SYNC LOCALSTORAGE (v4 for forced re-order update)
   useEffect(() => {
@@ -307,7 +310,8 @@ export const GymEngine = () => {
   const handleVideoUpload = async (file: File) => {
     if (!file || !videoModal.exerciseId) return;
     setIsUploading(true);
-    setAiFeedback(null);
+    setAnalyzingExId(videoModal.exerciseId);
+    // setAiFeedback(null); // No longer needed as we use Map
     try {
       const ext = file.name.split('.').pop() || 'mp4';
       const path = `${videoModal.exerciseId}_${Date.now()}.${ext}`;
@@ -328,14 +332,20 @@ export const GymEngine = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ videoUrl: publicUrl, exerciseName: videoModal.exerciseName }),
       });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error);
-      setAiFeedback(data.feedback);
+      const result = await res.json();
+      if (result.success && result.feedback) {
+        setAiFeedbackMap(prev => ({ ...prev, [videoModal.exerciseId]: result.feedback }));
+        setVideoModal({ open: false, exerciseName: '', exerciseId: '' });
+      } else {
+        throw new Error(result.error || 'Error en análisis');
+      }
     } catch (err: any) {
-      alert(`❌ Error: ${err.message}`);
+      console.error('AI Analysis Error:', err);
+      alert('Error analizando técnica: ' + err.message);
     } finally {
       setIsUploading(false);
       setIsAnalyzing(false);
+      setAnalyzingExId(null);
     }
   };
 
@@ -387,7 +397,7 @@ export const GymEngine = () => {
      const matchesSearch = searchQuery === '' || name.toLowerCase().includes(searchQuery.toLowerCase());
      return matchesFilter && matchesSearch;
   });
-  const FILTERS = ['Todos', 'Espalda', 'Pecho', 'Hombro', 'Bíceps', 'Tríceps', 'Cuádriceps', 'Isquios', 'Glúteo', 'Core'];
+  const FILTERS = ['Todos', 'Espalda', 'Pecho', 'Hombro', 'Bíceps', 'Tríceps', 'Cuádriceps', 'Isquios', 'Glúteo', 'Core', 'Antebrazo', 'Gemelo'];
 
   return (
     <div className="bg-[#1A120B] md:p-6 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.6)] md:border border-accent/20 relative overflow-hidden font-sans">
@@ -540,14 +550,67 @@ export const GymEngine = () => {
                 </div>
              ))}
 
-             {/* BOTON + AÑADIR */}
-             <button 
-               onClick={() => setIsLibraryOpen(true)}
-               className="w-full border border-dashed border-accent/20 text-accent/80 hover:text-accent hover:border-accent hover:bg-accent/5 font-black text-sm tracking-[0.2em] uppercase p-5 rounded-xl transition-all flex items-center justify-center gap-3 mt-4"
-             >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-                Añadir Ejercicio 
-             </button>
+             {/* SEARCHABLE SELECTOR INTEGRATED */}
+             <div className="relative mt-4">
+                {!showEditorSearch ? (
+                  <button 
+                    onClick={() => setShowEditorSearch(true)}
+                    className="w-full border border-dashed border-accent/20 text-accent/80 hover:text-accent hover:border-accent hover:bg-accent/5 font-black text-sm tracking-[0.2em] uppercase p-5 rounded-xl transition-all flex items-center justify-center gap-3"
+                  >
+                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                     Añadir Ejercicio 
+                  </button>
+                ) : (
+                  <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="relative">
+                      <input 
+                        type="text" 
+                        placeholder="Buscar ejercicio (ej: Press, Sentadilla...)" 
+                        autoFocus
+                        value={editorSearchQuery}
+                        onChange={(e) => setEditorSearchQuery(e.target.value)}
+                        className="w-full bg-[#1A120B] border border-accent/40 rounded-xl py-4 px-12 text-sm text-white focus:ring-1 focus:ring-accent outline-none font-bold tracking-wide"
+                      />
+                      <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-accent/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                      <button onClick={() => { setShowEditorSearch(false); setEditorSearchQuery(''); }} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 hover:text-white transition-colors">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                      </button>
+                    </div>
+
+                    {editorSearchQuery.trim() !== '' && (
+                      <div className="mt-2 bg-[#27211B] border border-white/5 rounded-xl max-h-60 overflow-y-auto shadow-2xl z-20 relative divide-y divide-white/5">
+                        {Object.keys(GLOBAL_LIBRARY)
+                          .filter(name => name.toLowerCase().includes(editorSearchQuery.toLowerCase()))
+                          .slice(0, 10)
+                          .map(name => (
+                            <button 
+                              key={name}
+                              onClick={() => { insertExerciseFromLibrary(name); setEditorSearchQuery(''); setShowEditorSearch(false); }}
+                              className="w-full text-left px-5 py-4 hover:bg-accent hover:text-[#1A120B] transition-colors flex items-center justify-between group"
+                            >
+                              <div>
+                                <span className="font-bold text-sm block">{name}</span>
+                                <span className="text-[9px] uppercase font-black tracking-widest opacity-40 group-hover:opacity-60">{GLOBAL_LIBRARY[name].muscle}</span>
+                              </div>
+                              <span className="text-xl opacity-20 group-hover:opacity-100">+</span>
+                            </button>
+                          ))}
+                        {Object.keys(GLOBAL_LIBRARY).filter(name => name.toLowerCase().includes(editorSearchQuery.toLowerCase())).length === 0 && (
+                          <div className="p-8 text-center text-white/20 text-[10px] font-black uppercase tracking-widest">No se encontraron resultados</div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* ACCESO RÁPIDO A LIBRERÍA COMPLETA */}
+                    <button 
+                      onClick={() => { setIsLibraryOpen(true); setShowEditorSearch(false); setEditorSearchQuery(''); }}
+                      className="w-full text-center py-3 text-[9px] font-black uppercase tracking-[0.3em] text-accent/40 hover:text-accent transition-colors mt-2"
+                    >
+                      Ver Librería Completa
+                    </button>
+                  </div>
+                )}
+             </div>
           </div>
         </div>
       ) : (
@@ -580,14 +643,28 @@ export const GymEngine = () => {
                           {exercisePRs[exercise.name] ? `Anterior: ${exercisePRs[exercise.name]}` : 'Sin datos previos'}
                         </div>
                      </div>
-                     {/* VIDEO BUTTON */}
-                     <button
-                       className="video-btn shrink-0 w-9 h-9 rounded-xl bg-[#27211B] border border-white/10 flex items-center justify-center text-white/30 hover:text-accent hover:border-accent/30 transition-all"
-                       title="Grabar Técnica"
-                       onClick={(e) => { e.stopPropagation(); setVideoModal({ open: true, exerciseName: exercise.name, exerciseId: exercise.id }); }}
-                     >
-                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" /></svg>
-                     </button>
+                      {/* ANALIZAR TECNICA BUTTON */}
+                      <button
+                        className={`mt-4 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border font-black text-[10px] uppercase tracking-[0.2em] transition-all shadow-sm ${
+                          analyzingExId === exercise.id 
+                            ? 'bg-purple-500/20 border-purple-500/30 text-purple-300 animate-pulse cursor-wait'
+                            : 'bg-accent/5 border-accent/20 text-accent/80 hover:bg-accent hover:text-[#1A120B]'
+                        }`}
+                        onClick={(e) => { e.stopPropagation(); setVideoModal({ open: true, exerciseName: exercise.name, exerciseId: exercise.id }); }}
+                        disabled={analyzingExId === exercise.id}
+                      >
+                        {analyzingExId === exercise.id ? (
+                          <>
+                             <div className="w-3 h-3 rounded-full border border-purple-400 border-t-transparent animate-spin"></div>
+                             Cargando...
+                          </>
+                        ) : (
+                          <>
+                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" /></svg>
+                             Analizar Técnica
+                          </>
+                        )}
+                      </button>
                    </div>
                  </div>
                 </div>
@@ -638,6 +715,47 @@ export const GymEngine = () => {
                     )}
                   </div>
                 )}
+
+                 {/* AI FEEDBACK CARD (TARJETA DE CONSEJO) */}
+                 {aiFeedbackMap[exercise.id] && (
+                   <div className="mx-4 mb-6 mt-2 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                     <div className="bg-[#1A120B] border border-purple-500/30 rounded-2xl overflow-hidden shadow-[0_10px_30px_rgba(168,85,247,0.1)]">
+                       <div className="bg-purple-500/10 px-5 py-3 border-b border-purple-500/20 flex items-center gap-2">
+                         <span className="text-lg">🤖</span>
+                         <span className="text-[10px] font-black uppercase tracking-[0.2em] text-purple-300">Biofeedback de IA</span>
+                       </div>
+                       
+                       <div className="p-5 space-y-4">
+                         <p className="text-sm italic text-white/90 leading-relaxed">"{aiFeedbackMap[exercise.id].mensaje_general}"</p>
+                         
+                         <div className="grid gap-3">
+                           {([
+                             { key: 'postura' as const, label: 'Postura', icon: '🧍' },
+                             { key: 'rango' as const, label: 'Movimiento', icon: '↔️' },
+                             { key: 'estabilidad' as const, label: 'Control', icon: '⚖️' },
+                           ] as const).map(({ key, label, icon }) => {
+                             const point = aiFeedbackMap[exercise.id][key];
+                             const isGood = point.estado === 'bien';
+                             return (
+                               <div key={key} className={`flex items-start gap-3 p-3 rounded-xl border ${isGood ? 'bg-emerald-500/5 border-emerald-500/10' : 'bg-amber-500/5 border-amber-500/10'}`}>
+                                 <span className="text-base shrink-0 mt-0.5">{icon}</span>
+                                 <div>
+                                   <div className="flex items-center gap-2 mb-1">
+                                      <span className="text-[9px] font-black uppercase tracking-widest text-white/40">{label}</span>
+                                      <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded-full ${isGood ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                                        {isGood ? 'Correcto' : 'Ajustar'}
+                                      </span>
+                                   </div>
+                                   <p className="text-xs text-white/70 leading-snug">{point.texto}</p>
+                                 </div>
+                               </div>
+                             );
+                           })}
+                         </div>
+                       </div>
+                     </div>
+                   </div>
+                 )}
 
                 {/* TABLA HEVY ESTRUCTURADA */}
                 <div className="p-3 sm:p-5 bg-background">
@@ -799,7 +917,7 @@ export const GymEngine = () => {
                 <p className="text-[11px] text-accent/60 font-bold uppercase tracking-widest mt-0.5 truncate max-w-[200px]">{videoModal.exerciseName}</p>
               </div>
               <button
-                onClick={() => { setVideoModal({ open: false, exerciseName: '', exerciseId: '' }); setAiFeedback(null); }}
+                onClick={() => { setVideoModal({ open: false, exerciseName: '', exerciseId: '' }); }}
                 className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center text-white/40 hover:text-white transition-colors shrink-0"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -828,58 +946,8 @@ export const GymEngine = () => {
               </div>
             )}
 
-            {/* STATE: FEEDBACK RESULT */}
-            {aiFeedback && !isUploading && !isAnalyzing && (
-              <div className="space-y-3 animate-in fade-in slide-in-from-bottom-3 duration-500">
-                {/* Mensaje general */}
-                <div className="bg-purple-500/10 border border-purple-500/20 rounded-2xl p-4 mb-4">
-                  <div className="flex items-start gap-3">
-                    <span className="text-xl shrink-0">🤖</span>
-                    <p className="text-sm text-white/80 italic leading-relaxed">"{aiFeedback.mensaje_general}"</p>
-                  </div>
-                </div>
-
-                {/* 3 Puntos */}
-                {([
-                  { key: 'postura' as const, label: 'Postura', icon: '🧍' },
-                  { key: 'rango' as const, label: 'Rango de Movimiento', icon: '↔️' },
-                  { key: 'estabilidad' as const, label: 'Estabilidad', icon: '⚖️' },
-                ] as const).map(({ key, label, icon }) => {
-                  const point = aiFeedback[key];
-                  const isGood = point.estado === 'bien';
-                  return (
-                    <div
-                      key={key}
-                      className={`rounded-2xl p-4 border ${
-                        isGood
-                          ? 'bg-emerald-500/10 border-emerald-500/25'
-                          : 'bg-amber-500/10 border-amber-500/25'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 mb-1.5">
-                        <span className="text-base">{icon}</span>
-                        <span className={`text-[10px] font-black uppercase tracking-widest ${ isGood ? 'text-emerald-400' : 'text-amber-400' }`}>{label}</span>
-                        <span className={`ml-auto text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${ isGood ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400' }`}>
-                          {isGood ? '✔ Bien' : '▲ Mejora'}
-                        </span>
-                      </div>
-                      <p className={`text-sm leading-relaxed ${ isGood ? 'text-emerald-100/80' : 'text-amber-100/80' }`}>{point.texto}</p>
-                    </div>
-                  );
-                })}
-
-                {/* Volver a grabar */}
-                <button
-                  onClick={() => setAiFeedback(null)}
-                  className="w-full mt-2 py-3 rounded-2xl border border-white/10 text-white/30 hover:text-white/60 hover:border-white/20 text-xs font-black uppercase tracking-widest transition-all"
-                >
-                  ↺ Grabar otro vídeo
-                </button>
-              </div>
-            )}
-
             {/* STATE: DEFAULT — Upload options */}
-            {!isUploading && !isAnalyzing && !aiFeedback && (
+            {!isUploading && !isAnalyzing && (
               <div className="space-y-3">
                 <label className="w-full flex items-center justify-center gap-3 py-5 rounded-2xl font-black text-sm uppercase tracking-widest border-2 border-dashed border-accent/30 text-accent/70 hover:border-accent hover:text-accent hover:bg-accent/5 transition-all cursor-pointer">
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" /></svg>
