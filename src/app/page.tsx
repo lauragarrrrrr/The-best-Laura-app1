@@ -5,11 +5,12 @@ import { GymEngine } from "@/components/GymEngine";
 import { LazyChef } from "@/components/LazyChef";
 import { PhraseOfTheDay } from "@/components/PhraseOfTheDay";
 import { FeedbackPlaceholder } from "@/components/FeedbackPlaceholder";
+import { MoneyTracker } from "@/components/MoneyTracker";
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState('Trainings');
 
-  const tabs = ['Trainings', 'Food', 'Feedback'];
+  const tabs = ['Trainings', 'Food', 'Money', 'Feedback'];
 
   return (
     <div className="min-h-screen bg-background text-foreground font-sans p-4 md:p-8">
@@ -56,6 +57,12 @@ export default function Home() {
             </div>
           )}
 
+
+          {activeTab === 'Money' && (
+            <div className="w-full max-w-2xl mx-auto">
+              <MoneyTracker />
+            </div>
+          )}
 
           {activeTab === 'Feedback' && (
             <div className="space-y-8">
