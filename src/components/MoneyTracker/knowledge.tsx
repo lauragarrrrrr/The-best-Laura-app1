@@ -368,8 +368,9 @@ export function KnowledgeView({ state, setState, y, m }: { state: MoneyState; se
   return (
     <div className="space-y-8">
       <section>
-        <p className="display text-[clamp(3rem,15vw,4.75rem)] leading-[0.9] text-ink">Aprende.</p>
-        <p className="display text-2xl text-ink/80 mt-1">Lo básico para ahorrar e invertir con cabeza.</p>
+        <p className="hero-num">Aprende.</p>
+        <p className="hero-sub mt-2">Lo básico para ahorrar e invertir con cabeza.</p>
+        <span className="ribbon mt-4">{doneCount === steps.length ? 'RUTA COMPLETA' : `NIVEL ${doneCount} DE ${steps.length}`}</span>
       </section>
 
       {/* ---------- Ruta ---------- */}
@@ -379,7 +380,7 @@ export function KnowledgeView({ state, setState, y, m }: { state: MoneyState; se
           <span className="mono text-xs text-paper">{doneCount} / {steps.length}</span>
         </div>
         <div className="h-[3px] rounded-full bg-[#2A2A2A] overflow-hidden">
-          <div className="h-full bg-amber rounded-full transition-all duration-500" style={{ width: `${(doneCount / steps.length) * 100}%` }} />
+          <div className="h-full holo rounded-full transition-all duration-500" style={{ width: `${(doneCount / steps.length) * 100}%` }} />
         </div>
         <ol className="space-y-3">
           {steps.map((s, i) => (
@@ -409,15 +410,15 @@ export function KnowledgeView({ state, setState, y, m }: { state: MoneyState; se
       {/* ---------- Lecciones ---------- */}
       <section className="space-y-3">
         <div className="px-1">
-          <h2 className="display text-2xl text-ink">Lecciones</h2>
-          <p className="text-sm text-ink/65">{LESSONS.length} lecturas de 2 o 3 minutos.</p>
+          <h2 className="page-h2">Lecciones</h2>
+          <p className="page-text">{LESSONS.length} lecturas de 2 o 3 minutos.</p>
         </div>
         <div className="-mx-4 px-4 flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
           {THEMES.map((t) => (
             <button
               key={t}
               onClick={() => setTheme(t)}
-              className={`shrink-0 px-4 py-2 rounded-full text-xs font-extrabold border transition ${theme === t ? 'bg-ink text-paper border-ink' : 'bg-paper/60 border-ink/10 text-ink/70'}`}
+              className={`shrink-0 px-4 py-2 rounded-full text-xs font-extrabold border transition ${theme === t ? 'bg-paper text-ink border-paper' : 'bg-white/5 border-white/15 text-paper/75'}`}
             >
               {t}
             </button>
@@ -471,10 +472,10 @@ export function KnowledgeView({ state, setState, y, m }: { state: MoneyState; se
       {/* ---------- Glosario ---------- */}
       <section className="space-y-3">
         <div className="flex items-baseline justify-between px-1">
-          <h2 className="display text-2xl text-ink">Glosario</h2>
-          <span className="mono text-xs text-ink/60">{terms.length} TÉRMINOS</span>
+          <h2 className="page-h2">Glosario</h2>
+          <span className="page-meta">{terms.length} TÉRMINOS</span>
         </div>
-        <input id="glossary-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar: TER, ETF, inflación…" className="field w-full" />
+        <input id="glossary-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar: TER, ETF, inflación…" className="field w-full !bg-widget" />
         <dl className="glass divide-y divide-ink/10">
           {shownTerms.map(([t, d]) => (
             <div key={t} className="px-4 py-3">
@@ -485,7 +486,7 @@ export function KnowledgeView({ state, setState, y, m }: { state: MoneyState; se
           {terms.length === 0 && <p className="px-4 py-4 text-sm text-ink/60">No encuentro ese término. Prueba con otra palabra.</p>}
         </dl>
         {!q && !allTerms && (
-          <button onClick={() => setAllTerms(true)} className="w-full py-3 rounded-full bg-ink text-paper font-bold text-sm">
+          <button onClick={() => setAllTerms(true)} className="w-full py-3 rounded-full bg-white/10 border border-white/15 text-paper font-bold text-sm">
             Ver los {GLOSSARY.length} términos
           </button>
         )}
@@ -494,8 +495,8 @@ export function KnowledgeView({ state, setState, y, m }: { state: MoneyState; se
       {/* ---------- Biblioteca ---------- */}
       <section className="space-y-3" id="biblioteca">
         <div className="px-1">
-          <h2 className="display text-2xl text-ink">Biblioteca</h2>
-          <p className="text-sm text-ink/65">La idea principal de ocho libros clásicos sobre dinero, en dos frases y un paso práctico.</p>
+          <h2 className="page-h2">Biblioteca</h2>
+          <p className="page-text">La idea principal de ocho libros clásicos sobre dinero, en dos frases y un paso práctico.</p>
         </div>
         <div className="-mx-4 px-4 overflow-x-auto snap-x snap-mandatory flex gap-3 pb-2" style={{ scrollbarWidth: 'none' }}>
           {BOOKS.map((b) => {
@@ -521,7 +522,7 @@ export function KnowledgeView({ state, setState, y, m }: { state: MoneyState; se
         </div>
       </section>
 
-      <p className="mono text-[10px] text-ink/50 px-1 leading-relaxed">
+      <p className="page-meta text-[10px] px-1 leading-relaxed">
         CONTENIDO EDUCATIVO Y GENERAL, RESUMIDO CON PALABRAS PROPIAS. NO ES ASESORAMIENTO FINANCIERO NI FISCAL PERSONALIZADO. LAS RENTABILIDADES PASADAS NO GARANTIZAN LAS FUTURAS. ANTES DE INVERTIR, INFÓRMATE O CONSULTA A UN PROFESIONAL.
       </p>
     </div>

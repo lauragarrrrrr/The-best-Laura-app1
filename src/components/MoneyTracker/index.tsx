@@ -8,7 +8,7 @@ import {
   type Category, type Expense, type ExpenseIcon, type MoneyState,
 } from './data';
 import { IconPicker, IconTile, resolveIcon } from './icons';
-import { CheckMark, ConfirmDialog, Donut, GroupSheet, PaidToggle, Segmented, Sheet, ToggleRow, type Group, type PendingConfirm } from './ui';
+import { CheckMark, ConfirmDialog, Donut, GroupSheet, PaidToggle, RhythmCurve, Scenes, Segmented, Sheet, ToggleRow, type Group, type PendingConfirm } from './ui';
 import { SavingsView } from './savings';
 import { AdviceView } from './advice';
 import { KnowledgeView } from './knowledge';
@@ -24,7 +24,7 @@ const WEEKDAYS = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'];
 /** Solo renderiza en cliente: la fecha actual y localStorage no existen en el servidor. */
 export const MoneyTracker = () => {
   const hasHydrated = useHasHydrated();
-  if (!hasHydrated) return <div className="h-[80vh] rounded-[32px] bg-slab/20 animate-pulse" />;
+  if (!hasHydrated) return <div className="h-[80vh] rounded-[32px] bg-white/5 animate-pulse" />;
   return <MoneyTrackerInner />;
 };
 
@@ -78,6 +78,12 @@ function MoneyTrackerInner() {
       .filter((s) => s.cat)
       .sort((a, b) => b.value - a.value);
   }, [monthItems, catById]);
+
+  const dailyOneOff = useMemo(() => {
+    const arr = Array.from({ length: daysInMonth(y, m) }, () => 0);
+    for (const { e, day } of monthItems) if (!e.recurring) arr[day - 1] += e.amount;
+    return arr;
+  }, [monthItems, y, m]);
 
   const byDay = useMemo(() => {
     const map = new Map<number, Expense[]>();
@@ -203,12 +209,13 @@ function MoneyTrackerInner() {
         : 'Todos los gastos';
 
   return (
-    <div className="space-y-6 pb-28">
+    <div className="space-y-6 pb-32">
+      <Scenes active={tab} />
       {/* ---------- Mes y secciones ---------- */}
       <section className="space-y-4">
         <div className="flex items-center gap-3">
           <button onClick={() => moveMonth(-1)} className="nav-btn" aria-label="Mes anterior">‹</button>
-          <span className="mono text-sm font-medium tracking-[0.2em] text-ink">
+          <span className="mono text-sm font-medium tracking-[0.2em] text-paper">
             {monthShort(y, m)} {y}
           </span>
           <button onClick={() => moveMonth(1)} className="nav-btn" aria-label="Mes siguiente">›</button>
@@ -234,23 +241,37 @@ function MoneyTrackerInner() {
       <>
       <section className="space-y-4">
         <div>
-          <p className="display text-[clamp(3rem,15vw,4.75rem)] leading-[0.9] text-ink tabular-nums">{eur(total)}</p>
-          <p className="display text-2xl text-ink/80 mt-1">
+          <p className="hero-num">{eur(total)}</p>
+          <p className="hero-sub mt-2">
             gastado en {monthLong(y, m)}.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           {change !== null && (
-            <span className={`chip ${change > 0 ? 'text-[#B3261E]' : 'text-[#1F7A4D]'}`}>
+            <span className={`chip ${change > 0 ? '!text-[#FF9A8A]' : '!text-[#8BE8B4]'}`}>
               {change > 0 ? '↗' : '↘'} {Math.abs(change).toFixed(0)}% VS {monthShort(prev.y, prev.m)}
-              {isCurrentMonth && <span className="text-ink/45"> · EN CURSO</span>}
+              {isCurrentMonth && <span className="text-paper/50"> · EN CURSO</span>}
             </span>
           )}
+          {recurringItems.length > 0 && paidCount === recurringItems.length && <span className="ribbon">TODO PAGADO</span>}
           <span className="chip">
-            PENDIENTE <b className={pendingTotal > 0 ? 'text-[#9A5B00]' : 'text-[#1F7A4D]'}>{eur(pendingTotal)}</b>
+            PENDIENTE <b className={pendingTotal > 0 ? 'text-amber' : 'text-[#8BE8B4]'}>{eur(pendingTotal)}</b>
           </span>
         </div>
+      </section>
+
+      {/* ---------- Ritmo del día a día ---------- */}
+      <section className="slab p-5 pb-3">
+        <div className="flex items-baseline justify-between mb-1">
+          <h2 className="display text-xl text-paper">Ritmo del día a día</h2>
+          <span className="mono text-[10px] text-mute">GASTOS PUNTUALES</span>
+        </div>
+        {dailyOneOff.some((v) => v > 0) ? (
+          <RhythmCurve values={dailyOneOff} today={isCurrentMonth ? now.getDate() : undefined} />
+        ) : (
+          <p className="text-sm text-mute py-6">Aún no hay gastos puntuales este mes. Cuando apuntes compras o salidas, aquí verás en qué días se concentran.</p>
+        )}
       </section>
 
       <Segmented
@@ -274,7 +295,7 @@ function MoneyTrackerInner() {
           </div>
           <div className="h-[3px] rounded-full bg-[#2A2A2A] mb-4 mx-1 overflow-hidden">
             <div
-              className="h-full bg-amber rounded-full transition-all duration-500"
+              className="h-full holo rounded-full transition-all duration-500"
               style={{ width: `${recurringItems.length ? (paidCount / recurringItems.length) * 100 : 0}%` }}
             />
           </div>
@@ -389,8 +410,8 @@ function MoneyTrackerInner() {
       {/* ---------- Lista ---------- */}
       <section className="space-y-3">
         <div className="flex items-baseline justify-between px-1">
-          <h2 className="display text-2xl text-ink first-letter:uppercase">{listTitle}</h2>
-          <span className="mono text-xs text-ink/60">{listItems.length} {listItems.length === 1 ? 'GASTO' : 'GASTOS'}</span>
+          <h2 className="page-h2 first-letter:uppercase">{listTitle}</h2>
+          <span className="page-meta">{listItems.length} {listItems.length === 1 ? 'GASTO' : 'GASTOS'}</span>
         </div>
 
         {listItems.length === 0 && (
@@ -443,9 +464,9 @@ function MoneyTrackerInner() {
       )}
 
       {/* ---------- Datos de la demo ---------- */}
-      <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 pt-2 mono text-[11px] text-ink/55">
-        <button onClick={() => resetData('demo')} className="hover:text-ink underline-offset-4 hover:underline">CARGAR DATOS DE EJEMPLO</button>
-        <button onClick={() => resetData('vacio')} className="hover:text-[#B3261E] underline-offset-4 hover:underline">EMPEZAR DE CERO</button>
+      <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 pt-2 page-meta">
+        <button onClick={() => resetData('demo')} className="hover:text-paper underline-offset-4 hover:underline">CARGAR DATOS DE EJEMPLO</button>
+        <button onClick={() => resetData('vacio')} className="hover:text-[#FF9A8A] underline-offset-4 hover:underline">EMPEZAR DE CERO</button>
       </div>
 
       {/* ---------- Hojas ---------- */}

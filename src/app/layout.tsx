@@ -19,12 +19,12 @@ export const metadata: Metadata = {
   description: "Control de gastos, suscripciones y pagos mensuales",
   appleWebApp: {
     title: "Gastos",
-    statusBarStyle: "default",
+    statusBarStyle: "black",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#BAB5AD",
+  themeColor: "#050505",
 };
 
 export default function RootLayout({

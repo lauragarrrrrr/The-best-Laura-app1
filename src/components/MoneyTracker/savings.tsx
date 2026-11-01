@@ -37,6 +37,7 @@ export function SavingsView({ state, setState, y, m, setPending }: Props) {
 
   const totals = useMemo(() => savingsTotals(state.savings, y, m), [state.savings, y, m]);
   const totalAll = [...totals.values()].reduce((a, b) => a + b, 0);
+  const milestone = [100000, 50000, 25000, 10000, 5000, 2500, 1000, 500].find((v) => totalAll >= v);
 
   const history = useMemo(
     () =>
@@ -107,16 +108,17 @@ export function SavingsView({ state, setState, y, m, setPending }: Props) {
       {/* ---------- Cabecera ---------- */}
       <section className="space-y-4">
         <div>
-          <p className="display text-[clamp(3rem,15vw,4.75rem)] leading-[0.9] text-ink tabular-nums">{eur(monthTotal)}</p>
-          <p className="display text-2xl text-ink/80 mt-1">ahorrado en {monthLong(y, m)}.</p>
+          <p className="hero-num">{eur(monthTotal)}</p>
+          <p className="hero-sub mt-2">ahorrado en {monthLong(y, m)}.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {rate !== null ? (
-            <span className={`chip ${rate >= 20 ? 'text-[#1F7A4D]' : rate >= 10 ? 'text-[#9A5B00]' : 'text-[#B3261E]'}`}>
+            <span className={`chip ${rate >= 20 ? '!text-[#8BE8B4]' : rate >= 10 ? '!text-amber' : '!text-[#FF9A8A]'}`}>
               {rate.toFixed(0)}% DE TUS INGRESOS
             </span>
           ) : null}
           <span className="chip">ACUMULADO <b>{eur(totalAll)}</b></span>
+          {milestone && <span className="ribbon">HITO · {milestone.toLocaleString('es-ES', { useGrouping: 'always' } as Intl.NumberFormatOptions)} € AHORRADOS</span>}
         </div>
         <button onClick={() => setIncomeOpen(true)} className="glass w-full flex items-center justify-between gap-3 px-4 py-3 text-left">
           <span>
@@ -231,8 +233,8 @@ export function SavingsView({ state, setState, y, m, setPending }: Props) {
           {/* ---------- Aportaciones ---------- */}
           <section className="space-y-3">
             <div className="flex items-baseline justify-between px-1">
-              <h2 className="display text-2xl text-ink">Aportaciones</h2>
-              <span className="mono text-xs text-ink/60">{monthEntries.length} EN {monthShort(y, m)}</span>
+              <h2 className="page-h2">Aportaciones</h2>
+              <span className="page-meta">{monthEntries.length} EN {monthShort(y, m)}</span>
             </div>
             {monthEntries.length === 0 && (
               <div className="glass p-6 text-center">
