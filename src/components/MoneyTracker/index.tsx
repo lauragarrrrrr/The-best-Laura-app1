@@ -283,6 +283,8 @@ function MoneyTrackerInner() {
   const [selectedCat, setSelectedCat] = useState<CategoryId | null>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [showForm, setShowForm] = useState(false);
+  // Confirmación dentro de la página (no usamos window.confirm: algunos visores lo bloquean)
+  const [pending, setPending] = useState<{ message: string; action: string; run: () => void } | null>(null);
 
   // Guardado automático
   useEffect(() => {
@@ -341,8 +343,14 @@ function MoneyTrackerInner() {
     setState((s) => ({ ...s, paid: { ...s.paid, [`${id}:${mk}`]: !s.paid[`${id}:${mk}`] } }));
 
   const removeExpense = (id: string) => {
-    if (!confirm('¿Eliminar este gasto? Si es recurrente, desaparece de todos los meses.')) return;
-    setState((s) => ({ ...s, expenses: s.expenses.filter((e) => e.id !== id) }));
+    const e = state.expenses.find((x) => x.id === id);
+    setPending({
+      message: e?.recurring
+        ? `¿Eliminar «${e.name}»? Al ser mensual, desaparece de todos los meses.`
+        : `¿Eliminar «${e?.name ?? 'este gasto'}»?`,
+      action: 'Eliminar',
+      run: () => setState((s) => ({ ...s, expenses: s.expenses.filter((x) => x.id !== id) })),
+    });
   };
 
   const resetData = (mode: 'demo' | 'vacio') => {
@@ -350,12 +358,17 @@ function MoneyTrackerInner() {
       mode === 'demo'
         ? '¿Cargar los datos de ejemplo? Se perderán los gastos actuales.'
         : '¿Borrar todos los gastos y empezar de cero?';
-    if (!confirm(msg)) return;
-    setState(mode === 'demo' ? seedData() : { expenses: [], paid: {} });
-    setSelectedDay(null);
-    setSelectedCat(null);
-    const today = new Date();
-    setCursor({ y: today.getFullYear(), m: today.getMonth() });
+    setPending({
+      message: msg,
+      action: mode === 'demo' ? 'Cargar ejemplo' : 'Borrar todo',
+      run: () => {
+        setState(mode === 'demo' ? seedData() : { expenses: [], paid: {} });
+        setSelectedDay(null);
+        setSelectedCat(null);
+        const today = new Date();
+        setCursor({ y: today.getFullYear(), m: today.getMonth() });
+      },
+    });
   };
 
   const addExpense = (e: Omit<Expense, 'id'>) => {
@@ -587,6 +600,40 @@ function MoneyTrackerInner() {
           Empezar de cero
         </button>
       </div>
+
+      {pending && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-4"
+          onClick={() => setPending(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="w-full max-w-sm bg-card rounded-2xl border border-accent/20 p-5 space-y-4 shadow-2xl"
+            onClick={(ev) => ev.stopPropagation()}
+          >
+            <p className="text-sm leading-relaxed">{pending.message}</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setPending(null)}
+                className="flex-1 py-2.5 rounded-lg bg-background/60 text-foreground/80 font-semibold"
+                autoFocus
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  pending.run();
+                  setPending(null);
+                }}
+                className="flex-1 py-2.5 rounded-lg bg-[#EE6A4D] text-white font-bold"
+              >
+                {pending.action}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
