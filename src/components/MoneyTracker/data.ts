@@ -76,31 +76,31 @@ export type MoneyState = {
 /* ------------------------------------------------------------------ */
 
 export const DEFAULT_CATEGORIES: Category[] = [
-  { id: 'hogar', label: 'Hogar', emoji: '🏠', color: '#5EC8E5', essential: true },
-  { id: 'alimentacion', label: 'Alimentación', emoji: '🍴', color: '#F5A300', essential: true },
-  { id: 'ocio', label: 'Ocio y viajes', emoji: '🎭', color: '#F2D24B' },
-  { id: 'suscripciones', label: 'Suscripciones', emoji: '📺', color: '#E5484D' },
-  { id: 'transporte', label: 'Transporte', emoji: '🚗', color: '#8E7CF0', essential: true },
-  { id: 'salud', label: 'Salud y deporte', emoji: '💪', color: '#4CC38A', essential: true },
-  { id: 'compras', label: 'Compras', emoji: '🛍️', color: '#E26AC1' },
-  { id: 'otros', label: 'Otros', emoji: '📦', color: '#9A958E' },
+  { id: 'hogar', label: 'Hogar', emoji: '🏠', color: '#A0673F', essential: true },
+  { id: 'alimentacion', label: 'Alimentación', emoji: '🍴', color: '#D9A441', essential: true },
+  { id: 'ocio', label: 'Ocio y viajes', emoji: '🎭', color: '#8E2C3E' },
+  { id: 'suscripciones', label: 'Suscripciones', emoji: '📺', color: '#E8DCC8' },
+  { id: 'transporte', label: 'Transporte', emoji: '🚗', color: '#6B6560', essential: true },
+  { id: 'salud', label: 'Salud y deporte', emoji: '💪', color: '#C7A27C', essential: true },
+  { id: 'compras', label: 'Compras', emoji: '🛍️', color: '#6E4430' },
+  { id: 'otros', label: 'Otros', emoji: '📦', color: '#A39B92' },
 ];
 
 export const FALLBACK_CATEGORY_ID = 'otros';
 
 export const DEFAULT_BUCKETS: SavingsBucket[] = [
-  { id: 'inversion', label: 'Inversión', emoji: '📈', color: '#F5A300', invest: true },
-  { id: 'emergencia', label: 'Fondo de emergencia', emoji: '🛟', color: '#5EC8E5', invest: false },
-  { id: 'objetivos', label: 'Objetivos', emoji: '✈️', color: '#E26AC1', invest: false },
-  { id: 'colchon', label: 'Cuenta de ahorro', emoji: '🏦', color: '#4CC38A', invest: false },
+  { id: 'inversion', label: 'Inversión', emoji: '📈', color: '#D9A441', invest: true },
+  { id: 'emergencia', label: 'Fondo de emergencia', emoji: '🛟', color: '#A0673F', invest: false },
+  { id: 'objetivos', label: 'Objetivos', emoji: '✈️', color: '#8E2C3E', invest: false },
+  { id: 'colchon', label: 'Cuenta de ahorro', emoji: '🏦', color: '#A39B92', invest: false },
 ];
 export const EMERGENCY_BUCKET_ID = 'emergencia';
 export const FALLBACK_BUCKET_ID = 'colchon';
 
 /** Paleta para emojis y categorías personalizadas. */
 export const SWATCHES = [
-  '#F5A300', '#E5484D', '#E26AC1', '#8E7CF0', '#3E7BFA', '#5EC8E5',
-  '#4CC38A', '#F2D24B', '#9A958E', '#F2EEE8', '#2B2B2B', '#B4643C',
+  '#A0673F', '#6E4430', '#C7A27C', '#E8DCC8', '#D9A441', '#F0D27A',
+  '#8E2C3E', '#5E1A28', '#FBF8F3', '#A39B92', '#6B6560', '#1E1915',
 ];
 
 export const EMOJI_CHOICES = [
@@ -203,7 +203,7 @@ export function inkOn(hex: string) {
   const v = hex.replace('#', '');
   const [r, g, b] = [0, 2, 4].map((i) => parseInt(v.slice(i, i + 2), 16) / 255);
   const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  return lum > 0.6 ? '#111111' : '#FFFFFF';
+  return lum > 0.6 ? '#241A13' : '#FBF8F3';
 }
 
 /* ------------------------------------------------------------------ */
@@ -297,46 +297,46 @@ export function seedData(): MoneyState {
   const startOfRecurring = (day: number) => iso(new Date(today.getFullYear(), today.getMonth() - 3, day));
 
   const recurring: [string, number, string, number, ExpenseIcon?][] = [
-    ['Alquiler', 650, 'hogar', 1, emoji('🔑', '#5EC8E5')],
-    ['Luz', 45.3, 'hogar', 3, emoji('💡', '#F2D24B')],
+    ['Alquiler', 650, 'hogar', 1, emoji('🔑', '#A0673F')],
+    ['Luz', 45.3, 'hogar', 3, emoji('💡', '#F0D27A')],
     ['Netflix', 13.99, 'suscripciones', 5],
-    ['DIGI', 20, 'hogar', 7, emoji('📶', '#3E7BFA')],
+    ['DIGI', 20, 'hogar', 7, emoji('📶', '#4A3B31')],
     ['Spotify', 11.99, 'suscripciones', 10],
     ['HBO Max', 9.99, 'suscripciones', 11],
-    ['Gimnasio', 39.9, 'salud', 12, emoji('🏋️', '#4CC38A')],
+    ['Gimnasio', 39.9, 'salud', 12, emoji('🏋️', '#C7A27C')],
     ['iCloud', 2.99, 'suscripciones', 19],
-    ['Seguro del coche', 32.5, 'transporte', 22, emoji('🛡️', '#8E7CF0')],
+    ['Seguro del coche', 32.5, 'transporte', 22, emoji('🛡️', '#6B6560')],
   ];
 
   // [concepto, importe, categoría, hace cuántos días, icono]
   const oneOff: [string, number, string, number, ExpenseIcon?][] = [
-    ['Mercadona', 64.2, 'alimentacion', 1, emoji('🛒', '#4CC38A')],
-    ['Brunch', 24.5, 'ocio', 2, emoji('🥞', '#F5A300')],
-    ['Gasolina', 55, 'transporte', 4, emoji('⛽', '#E5484D')],
+    ['Mercadona', 64.2, 'alimentacion', 1, emoji('🛒', '#C7A27C')],
+    ['Brunch', 24.5, 'ocio', 2, emoji('🥞', '#D9A441')],
+    ['Gasolina', 55, 'transporte', 4, emoji('⛽', '#8E2C3E')],
     ['Lidl', 41.75, 'alimentacion', 6],
     ['Zara', 49.95, 'compras', 8],
-    ['Cine', 17, 'ocio', 10, emoji('🍿', '#E5484D')],
+    ['Cine', 17, 'ocio', 10, emoji('🍿', '#8E2C3E')],
     ['Glovo', 22.4, 'alimentacion', 11],
-    ['Mercadona', 78.4, 'alimentacion', 13, emoji('🛒', '#4CC38A')],
-    ['Farmacia', 12.6, 'salud', 15, emoji('💊', '#4CC38A')],
-    ['Cena con amigas', 38, 'ocio', 18, emoji('🍷', '#B4643C')],
+    ['Mercadona', 78.4, 'alimentacion', 13, emoji('🛒', '#C7A27C')],
+    ['Farmacia', 12.6, 'salud', 15, emoji('💊', '#C7A27C')],
+    ['Cena con amigas', 38, 'ocio', 18, emoji('🍷', '#7A4B2A')],
     ['Uber', 14.8, 'transporte', 19],
-    ['Frutería', 18.3, 'alimentacion', 20, emoji('🍎', '#E5484D')],
-    ['Mercadona', 82.1, 'alimentacion', 24, emoji('🛒', '#4CC38A')],
-    ['Gasolina', 52, 'transporte', 27, emoji('⛽', '#E5484D')],
+    ['Frutería', 18.3, 'alimentacion', 20, emoji('🍎', '#8E2C3E')],
+    ['Mercadona', 82.1, 'alimentacion', 24, emoji('🛒', '#C7A27C')],
+    ['Gasolina', 52, 'transporte', 27, emoji('⛽', '#8E2C3E')],
     ['Vuelo Ryanair', 96, 'ocio', 31],
     ['Airbnb Valencia', 140, 'ocio', 31],
-    ['Mercadona', 71.35, 'alimentacion', 34, emoji('🛒', '#4CC38A')],
+    ['Mercadona', 71.35, 'alimentacion', 34, emoji('🛒', '#C7A27C')],
     ['IKEA', 34.99, 'hogar', 37],
     ['Carrefour', 39.9, 'alimentacion', 41],
-    ['Concierto', 45, 'ocio', 44, emoji('🎤', '#E26AC1')],
-    ['Mercadona', 88.6, 'alimentacion', 48, emoji('🛒', '#4CC38A')],
-    ['Gasolina', 58, 'transporte', 52, emoji('⛽', '#E5484D')],
-    ['Mercadona', 69.8, 'alimentacion', 55, emoji('🛒', '#4CC38A')],
-    ['Regalo cumpleaños', 40, 'compras', 58, emoji('🎁', '#E26AC1')],
-    ['Cena', 32, 'ocio', 62, emoji('🍷', '#B4643C')],
-    ['Mercadona', 75.2, 'alimentacion', 66, emoji('🛒', '#4CC38A')],
-    ['Fisioterapeuta', 45, 'salud', 70, emoji('💆', '#4CC38A')],
+    ['Concierto', 45, 'ocio', 44, emoji('🎤', '#6E4430')],
+    ['Mercadona', 88.6, 'alimentacion', 48, emoji('🛒', '#C7A27C')],
+    ['Gasolina', 58, 'transporte', 52, emoji('⛽', '#8E2C3E')],
+    ['Mercadona', 69.8, 'alimentacion', 55, emoji('🛒', '#C7A27C')],
+    ['Regalo cumpleaños', 40, 'compras', 58, emoji('🎁', '#6E4430')],
+    ['Cena', 32, 'ocio', 62, emoji('🍷', '#7A4B2A')],
+    ['Mercadona', 75.2, 'alimentacion', 66, emoji('🛒', '#C7A27C')],
+    ['Fisioterapeuta', 45, 'salud', 70, emoji('💆', '#C7A27C')],
   ];
 
   const expenses: Expense[] = [

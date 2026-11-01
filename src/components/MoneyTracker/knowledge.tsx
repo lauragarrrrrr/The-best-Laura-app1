@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from 'react';
 import {
-  EMERGENCY_BUCKET_ID, eur, eurRound, expensesForMonth, normalize, savingsTotals,
+  EMERGENCY_BUCKET_ID, eur, eurRound, expensesForMonth, inkOn, normalize, savingsTotals,
   type MoneyState,
 } from './data';
 import { BOOKS, futureValue } from './advice';
@@ -288,15 +288,15 @@ function CompoundCalculator({ defaultMonthly }: { defaultMonthly: number }) {
       <div className="grid grid-cols-3 gap-2">
         <label className="space-y-1" htmlFor="calc-monthly">
           <span className="mono text-[10px] text-mute block">AL MES</span>
-          <input id="calc-monthly" inputMode="decimal" value={monthly} onChange={(e) => setMonthly(e.target.value)} className="w-full rounded-xl bg-[#262626] px-3 py-2 font-bold tabular-nums text-paper" />
+          <input id="calc-monthly" inputMode="decimal" value={monthly} onChange={(e) => setMonthly(e.target.value)} className="w-full rounded-xl bg-[#2A211A] px-3 py-2 font-bold tabular-nums text-paper" />
         </label>
         <label className="space-y-1" htmlFor="calc-years">
           <span className="mono text-[10px] text-mute block">AÑOS · {years}</span>
-          <input id="calc-years" type="range" min={1} max={40} value={years} onChange={(e) => setYears(+e.target.value)} className="w-full accent-[#F5A300] mt-2" />
+          <input id="calc-years" type="range" min={1} max={40} value={years} onChange={(e) => setYears(+e.target.value)} className="w-full accent-[#D9A441] mt-2" />
         </label>
         <label className="space-y-1" htmlFor="calc-rate">
           <span className="mono text-[10px] text-mute block">ANUAL · {rate}%</span>
-          <input id="calc-rate" type="range" min={0} max={10} step={0.5} value={rate} onChange={(e) => setRate(+e.target.value)} className="w-full accent-[#F5A300] mt-2" />
+          <input id="calc-rate" type="range" min={0} max={10} step={0.5} value={rate} onChange={(e) => setRate(+e.target.value)} className="w-full accent-[#D9A441] mt-2" />
         </label>
       </div>
       <div className="flex items-end gap-1.5 h-28" role="img" aria-label={`Evolución hasta ${eurRound(final)}`}>
@@ -379,7 +379,7 @@ export function KnowledgeView({ state, setState, y, m }: { state: MoneyState; se
           <h2 className="display text-xl text-paper">Tu ruta</h2>
           <span className="mono text-xs text-paper">{doneCount} / {steps.length}</span>
         </div>
-        <div className="h-[3px] rounded-full bg-[#2A2A2A] overflow-hidden">
+        <div className="h-[3px] rounded-full bg-[#2E241D] overflow-hidden">
           <div className="h-full holo rounded-full transition-all duration-500" style={{ width: `${(doneCount / steps.length) * 100}%` }} />
         </div>
         <ol className="space-y-3">
@@ -390,7 +390,7 @@ export function KnowledgeView({ state, setState, y, m }: { state: MoneyState; se
                 disabled={!s.manual}
                 onClick={() => setState((st) => ({ ...st, checks: { ...st.checks, [s.id]: !st.checks[s.id] } }))}
                 className={`w-9 h-9 rounded-full shrink-0 flex items-center justify-center mono text-sm transition ${
-                  s.done ? 'bg-paper text-ink' : 'bg-[#0B0B0B] text-paper border border-[#333]'
+                  s.done ? 'bg-paper text-ink' : 'bg-[#1A1410] text-paper border border-[#333]'
                 } ${s.manual ? 'cursor-pointer hover:ring-2 hover:ring-amber' : 'cursor-default'}`}
                 aria-label={s.manual ? `${s.done ? 'Desmarcar' : 'Marcar'} «${s.title}»` : `${s.title}: ${s.done ? 'hecho' : 'pendiente'}`}
                 aria-pressed={s.manual ? s.done : undefined}
@@ -400,7 +400,7 @@ export function KnowledgeView({ state, setState, y, m }: { state: MoneyState; se
               <div className="min-w-0 pt-1">
                 <p className={`font-bold text-sm ${s.done ? 'text-paper' : 'text-paper/90'}`}>{s.title}</p>
                 <p className="text-[13px] text-mute leading-snug">{s.text}</p>
-                <p className="mono text-[9px] text-[#6E6E6E] mt-1">{s.manual ? 'MÁRCALO TÚ' : 'SE COMPRUEBA CON TUS DATOS'}</p>
+                <p className="mono text-[9px] text-[#7A6F66] mt-1">{s.manual ? 'MÁRCALO TÚ' : 'SE COMPRUEBA CON TUS DATOS'}</p>
               </div>
             </li>
           ))}
@@ -459,7 +459,7 @@ export function KnowledgeView({ state, setState, y, m }: { state: MoneyState; se
         <ul className="space-y-3">
           {MISTAKES.map(([t, d]) => (
             <li key={t} className="flex gap-3">
-              <span className="w-6 h-6 rounded-full bg-[#D93A2E] text-white flex items-center justify-center text-xs font-black shrink-0 mt-0.5" aria-hidden="true">✕</span>
+              <span className="w-6 h-6 rounded-full bg-[#7A2433] text-white flex items-center justify-center text-xs font-black shrink-0 mt-0.5" aria-hidden="true">✕</span>
               <span className="min-w-0">
                 <span className="font-bold text-paper text-sm block">{t}</span>
                 <span className="text-[13px] text-mute leading-snug block">{d}</span>
@@ -500,7 +500,7 @@ export function KnowledgeView({ state, setState, y, m }: { state: MoneyState; se
         </div>
         <div className="-mx-4 px-4 overflow-x-auto snap-x snap-mandatory flex gap-3 pb-2" style={{ scrollbarWidth: 'none' }}>
           {BOOKS.map((b) => {
-            const ink = b.cover === '#2B2B2B' ? '#F4F1EC' : '#111111';
+            const ink = inkOn(b.cover);
             return (
               <article id={`libro-${b.id}`} key={b.id} className="snap-start shrink-0 w-[78%] max-w-[300px] slab p-0 overflow-hidden flex flex-col scroll-mt-24">
                 <div className="p-4 pb-3 flex flex-col gap-2 min-h-[132px] justify-between" style={{ background: b.cover }}>
@@ -511,7 +511,7 @@ export function KnowledgeView({ state, setState, y, m }: { state: MoneyState; se
                 <div className="p-4 space-y-2 flex-1 flex flex-col">
                   <p className="display text-lg text-amber leading-tight">{b.idea}</p>
                   <p className="text-[13px] text-paper/80 leading-relaxed flex-1">{b.summary}</p>
-                  <p className="text-[13px] text-paper leading-relaxed border-t border-[#2A2A2A] pt-2">
+                  <p className="text-[13px] text-paper leading-relaxed border-t border-[#2E241D] pt-2">
                     <span className="mono text-[10px] text-amber block">PRUÉBALO</span>
                     {b.apply}
                   </p>

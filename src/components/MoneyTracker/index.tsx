@@ -210,7 +210,7 @@ function MoneyTrackerInner() {
 
   return (
     <div className="space-y-6 pb-32">
-      <Scenes active={tab} />
+      <Scenes />
       {/* ---------- Mes y secciones ---------- */}
       <section className="space-y-4">
         <div className="flex items-center gap-3">
@@ -249,14 +249,14 @@ function MoneyTrackerInner() {
 
         <div className="flex flex-wrap items-center gap-2">
           {change !== null && (
-            <span className={`chip ${change > 0 ? '!text-[#FF9A8A]' : '!text-[#8BE8B4]'}`}>
+            <span className={`chip ${change > 0 ? '!text-[#E3A1AB]' : '!text-[#D8C3A0]'}`}>
               {change > 0 ? '↗' : '↘'} {Math.abs(change).toFixed(0)}% VS {monthShort(prev.y, prev.m)}
               {isCurrentMonth && <span className="text-paper/50"> · EN CURSO</span>}
             </span>
           )}
           {recurringItems.length > 0 && paidCount === recurringItems.length && <span className="ribbon">TODO PAGADO</span>}
           <span className="chip">
-            PENDIENTE <b className={pendingTotal > 0 ? 'text-amber' : 'text-[#8BE8B4]'}>{eur(pendingTotal)}</b>
+            PENDIENTE <b className={pendingTotal > 0 ? 'text-amber' : 'text-[#D8C3A0]'}>{eur(pendingTotal)}</b>
           </span>
         </div>
       </section>
@@ -293,7 +293,7 @@ function MoneyTrackerInner() {
               {paidCount} / {recurringItems.length}
             </span>
           </div>
-          <div className="h-[3px] rounded-full bg-[#2A2A2A] mb-4 mx-1 overflow-hidden">
+          <div className="h-[3px] rounded-full bg-[#2E241D] mb-4 mx-1 overflow-hidden">
             <div
               className="h-full holo rounded-full transition-all duration-500"
               style={{ width: `${recurringItems.length ? (paidCount / recurringItems.length) * 100 : 0}%` }}
@@ -341,7 +341,7 @@ function MoneyTrackerInner() {
                   ) : (
                     <span
                       className={`w-full h-full rounded-full flex items-center justify-center mono text-[13px] ${
-                        isToday ? 'bg-[#1F1A10] text-amber font-bold' : isPast ? 'bg-[#232323] text-[#6E6E6E]' : 'bg-[#0B0B0B] text-[#E6E6E6]'
+                        isToday ? 'bg-[#2B2112] text-amber font-bold' : isPast ? 'bg-[#2A211B] text-[#7A6F66]' : 'bg-[#1A1410] text-[#EDE5DA]'
                       }`}
                     >
                       {day}
@@ -368,7 +368,7 @@ function MoneyTrackerInner() {
               const pct = total > 0 ? (value / total) * 100 : 0;
               const active = selectedCat === cat.id;
               return (
-                <div key={cat.id} className={`flex items-center gap-2 rounded-2xl transition ${active ? 'bg-[#2A2A2A]' : ''}`}>
+                <div key={cat.id} className={`flex items-center gap-2 rounded-2xl transition ${active ? 'bg-[#2E241D]' : ''}`}>
                   <button
                     onClick={() => setSelectedCat(active ? null : cat.id)}
                     className="flex-1 min-w-0 flex items-center gap-3 p-2 text-left"
@@ -380,7 +380,7 @@ function MoneyTrackerInner() {
                         <span className="font-bold text-paper text-sm tabular-nums">{eur(value)}</span>
                       </div>
                       <div className="flex items-center gap-2 mt-1.5">
-                        <div className="flex-1 h-[5px] rounded-full bg-[#2A2A2A] overflow-hidden">
+                        <div className="flex-1 h-[5px] rounded-full bg-[#2E241D] overflow-hidden">
                           <div className="h-full rounded-full" style={{ width: `${pct}%`, background: cat.color }} />
                         </div>
                         <span className="mono text-[10px] text-mute w-8 text-right">{pct.toFixed(0)}%</span>
@@ -389,7 +389,7 @@ function MoneyTrackerInner() {
                   </button>
                   <button
                     onClick={() => setCatEditor({ mode: 'edit', category: cat })}
-                    className="w-9 h-9 rounded-full text-mute hover:text-paper hover:bg-[#2A2A2A] shrink-0"
+                    className="w-9 h-9 rounded-full text-mute hover:text-paper hover:bg-[#2E241D] shrink-0"
                     aria-label={`Editar categoría ${cat.label}`}
                   >
                     ✎
@@ -400,7 +400,7 @@ function MoneyTrackerInner() {
           </div>
           <button
             onClick={() => setCatEditor({ mode: 'new' })}
-            className="w-full py-3 rounded-2xl border-2 border-dashed border-[#3A3A3A] text-mute hover:text-paper hover:border-mute font-bold text-sm"
+            className="w-full py-3 rounded-2xl border-2 border-dashed border-[#43362C] text-mute hover:text-paper hover:border-mute font-bold text-sm"
           >
             + Nueva categoría
           </button>
@@ -457,7 +457,7 @@ function MoneyTrackerInner() {
       {/* ---------- Botón principal ---------- */}
       <div className="fab-wrap">
         <button onClick={() => setEditor({ mode: 'new' })} className="fab" aria-label="Añadir gasto">
-          <span className="text-4xl leading-none font-black">+</span>
+          <span className="text-3xl leading-none font-medium">+</span>
         </button>
       </div>
       </>
@@ -466,7 +466,7 @@ function MoneyTrackerInner() {
       {/* ---------- Datos de la demo ---------- */}
       <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 pt-2 page-meta">
         <button onClick={() => resetData('demo')} className="hover:text-paper underline-offset-4 hover:underline">CARGAR DATOS DE EJEMPLO</button>
-        <button onClick={() => resetData('vacio')} className="hover:text-[#FF9A8A] underline-offset-4 hover:underline">EMPEZAR DE CERO</button>
+        <button onClick={() => resetData('vacio')} className="hover:text-[#E3A1AB] underline-offset-4 hover:underline">EMPEZAR DE CERO</button>
       </div>
 
       {/* ---------- Hojas ---------- */}
@@ -620,7 +620,7 @@ function ExpenseSheet({
 
         <div className="flex gap-3">
           {onDelete && (
-            <button type="button" onClick={onDelete} className="px-5 py-3.5 rounded-full bg-[#D93A2E]/10 text-[#B3261E] font-extrabold">
+            <button type="button" onClick={onDelete} className="px-5 py-3.5 rounded-full bg-[#7A2433]/10 text-[#7A2433] font-extrabold">
               Eliminar
             </button>
           )}

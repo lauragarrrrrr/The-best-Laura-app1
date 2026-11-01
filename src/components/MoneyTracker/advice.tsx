@@ -31,7 +31,7 @@ export const BOOKS: Book[] = [
     idea: 'Págate primero',
     summary: 'Una parte de todo lo que ganas es tuya: apártala antes de pagar nada más. El libro propone guardar al menos una décima parte de cada ingreso.',
     apply: 'Programa una transferencia automática del 10% el mismo día que cobras.',
-    cover: '#B4643C',
+    cover: '#7A4B2A',
   },
   {
     id: 'warren',
@@ -41,7 +41,7 @@ export const BOOKS: Book[] = [
     idea: 'La regla 50/30/20',
     summary: 'Reparte tus ingresos netos en tres cubos: en torno a un 50% para necesidades, un 30% para caprichos y un 20% para ahorro o deudas.',
     apply: 'Mira tu reparto real en la tarjeta 50/30/20 de arriba y ajusta el cubo que se pasa.',
-    cover: '#3E7BFA',
+    cover: '#4A3B31',
   },
   {
     id: 'housel',
@@ -51,7 +51,7 @@ export const BOOKS: Book[] = [
     idea: 'El tiempo hace el trabajo',
     summary: 'El interés compuesto premia la constancia durante muchos años más que acertar el mejor momento. Y conviene saber qué es «suficiente»: si el gasto sube con el sueldo, el ahorro nunca crece.',
     apply: 'Cuando te suban el sueldo, sube primero tu aportación y después tu gasto.',
-    cover: '#4CC38A',
+    cover: '#C7A27C',
   },
   {
     id: 'bogle',
@@ -61,7 +61,7 @@ export const BOOKS: Book[] = [
     idea: 'Compra todo el mercado, y barato',
     summary: 'En vez de buscar la acción ganadora, un fondo indexado diversificado y con comisiones bajas suele superar a la mayoría de gestores a largo plazo. Los costes se comen la rentabilidad año tras año.',
     apply: 'Revisa la comisión anual (TER) de tus fondos: un 1% de diferencia pesa mucho en 20 años.',
-    cover: '#F5A300',
+    cover: '#D9A441',
   },
   {
     id: 'malkiel',
@@ -71,7 +71,7 @@ export const BOOKS: Book[] = [
     idea: 'Diversifica y aporta cada mes',
     summary: 'Nadie predice el mercado de forma constante. Invertir la misma cantidad cada mes reparte el riesgo de entrar todo en un mal momento.',
     apply: 'Deja una aportación fija y automática a inversión, aunque sea pequeña.',
-    cover: '#8E7CF0',
+    cover: '#6B6560',
   },
   {
     id: 'graham',
@@ -81,7 +81,7 @@ export const BOOKS: Book[] = [
     idea: 'Que el «señor Mercado» no te mande',
     summary: 'El mercado es como un socio de humor cambiante: unos días eufórico y otros hundido. El inversor defensivo no vende por pánico y busca siempre un margen de seguridad.',
     apply: 'No mires tu inversión a diario: revísala una o dos veces al año.',
-    cover: '#2B2B2B',
+    cover: '#1E1915',
   },
   {
     id: 'sethi',
@@ -92,7 +92,7 @@ export const BOOKS: Book[] = [
     idea: 'Gasto consciente',
     summary: 'Gasta sin culpa en lo que te encanta y recorta sin piedad lo que no te importa. Automatiza ahorro y recibos para no depender de la fuerza de voluntad.',
     apply: 'Repasa tus suscripciones y cancela las que no hayas usado este mes.',
-    cover: '#E5484D',
+    cover: '#8E2C3E',
   },
   {
     id: 'stanley',
@@ -103,7 +103,7 @@ export const BOOKS: Book[] = [
     idea: 'Vive por debajo de tus posibilidades',
     summary: 'Muchas personas con patrimonio alto tienen ingresos normales. La diferencia está en gastar bastante menos de lo que ganan, no en parecer ricas.',
     apply: 'Cuando entre un dinero extra, inviértelo antes de subir tu nivel de vida.',
-    cover: '#5EC8E5',
+    cover: '#A0673F',
   },
 ];
 
@@ -118,10 +118,10 @@ export type Insight = { id: string; tone: Tone; emoji: string; title: string; te
 
 const TONE_ORDER: Record<Tone, number> = { alerta: 0, aviso: 1, idea: 2, bien: 3 };
 const TONE_STYLE: Record<Tone, { label: string; cls: string }> = {
-  alerta: { label: 'ALERTA', cls: 'bg-[#D93A2E] text-white' },
+  alerta: { label: 'ALERTA', cls: 'bg-[#7A2433] text-white' },
   aviso: { label: 'AVISO', cls: 'bg-amber text-ink' },
-  idea: { label: 'IDEA', cls: 'bg-[#3E7BFA] text-white' },
-  bien: { label: 'BIEN', cls: 'bg-[#1F7A4D] text-white' },
+  idea: { label: 'IDEA', cls: 'bg-[#4A3B31] text-white' },
+  bien: { label: 'BIEN', cls: 'bg-[#7A4B2A] text-white' },
 };
 
 /** Valor futuro de aportar `monthly` € al mes durante `years` años a un `annual` % anual. */
@@ -306,9 +306,9 @@ export function AdviceView({ state, y, m, onGo }: { state: MoneyState; y: number
   const income = incomeFor(state.income, y, m);
   const base = income ?? needs + wants + saved;
   const rows = [
-    { label: 'Necesidades', hint: 'Hogar, comida, transporte, salud', value: needs, target: 50, color: '#5EC8E5', over: true },
-    { label: 'Caprichos', hint: 'Ocio, compras, suscripciones', value: wants, target: 30, color: '#E26AC1', over: true },
-    { label: 'Ahorro', hint: 'Inversión y otros ahorros', value: saved, target: 20, color: '#F5A300', over: false },
+    { label: 'Necesidades', hint: 'Hogar, comida, transporte, salud', value: needs, target: 50, color: '#A0673F', over: true },
+    { label: 'Caprichos', hint: 'Ocio, compras, suscripciones', value: wants, target: 30, color: '#6E4430', over: true },
+    { label: 'Ahorro', hint: 'Inversión y otros ahorros', value: saved, target: 20, color: '#D9A441', over: false },
   ];
 
   return (
@@ -339,11 +339,11 @@ export function AdviceView({ state, y, m, onGo }: { state: MoneyState; y: number
                     <span className="text-paper font-bold text-sm block">{r.label}</span>
                     <span className="mono text-[10px] text-mute block">{r.hint.toUpperCase()}</span>
                   </span>
-                  <span className={`mono text-xs shrink-0 ${bad ? 'text-[#FF8A80]' : 'text-paper'}`}>
+                  <span className={`mono text-xs shrink-0 ${bad ? 'text-[#E3A1AB]' : 'text-paper'}`}>
                     {pct.toFixed(0)}% <span className="text-mute">/ {r.target}%</span>
                   </span>
                 </div>
-                <div className="relative h-3 rounded-full bg-[#2A2A2A]">
+                <div className="relative h-3 rounded-full bg-[#2E241D]">
                   <div className="absolute inset-y-0 left-0 rounded-full transition-all duration-500" style={{ width: `${Math.min(pct, 100)}%`, background: r.color }} />
                   <div className="absolute -top-1 -bottom-1 w-[2px] bg-paper rounded" style={{ left: `${r.target}%` }} title={`Objetivo ${r.target}%`} />
                 </div>

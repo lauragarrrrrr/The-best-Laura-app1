@@ -21,8 +21,8 @@ export function PaidToggle({ paid, onClick, label }: { paid: boolean; onClick: (
       aria-label={label}
       className={`w-10 h-10 rounded-[13px] flex items-center justify-center shrink-0 transition-all duration-150 ${
         paid
-          ? 'bg-ink text-paper shadow-[inset_0_2px_0_rgba(255,255,255,0.12)] translate-y-[1px]'
-          : 'bg-paper border-2 border-ink/80 shadow-[0_3px_0_rgba(17,17,17,0.85)] hover:-translate-y-[1px] active:translate-y-[2px] active:shadow-none'
+          ? 'bg-ink text-paper'
+          : 'bg-paper border-[1.5px] border-ink/50 hover:border-ink active:scale-95'
       }`}
     >
       {paid && <CheckMark size={18} />}
@@ -70,7 +70,7 @@ export function Donut({
   return (
     <div className="relative w-full max-w-[250px] aspect-square mx-auto">
       <svg viewBox="0 0 200 200" className="w-full h-full -rotate-90">
-        <circle cx="100" cy="100" r={r} fill="none" stroke="#262626" strokeWidth={stroke} />
+        <circle cx="100" cy="100" r={r} fill="none" stroke="#2A211A" strokeWidth={stroke} />
         {total > 0 &&
           slices.map((s) => {
             const len = (s.value / total) * C;
@@ -167,7 +167,7 @@ export function GroupSheet<T extends Group>({
         {toggle && <ToggleRow label={toggle.label} hint={toggle.hint} value={flag} onChange={setFlag} />}
         <div className="flex gap-3">
           {onDelete && (
-            <button type="button" onClick={onDelete} className="px-5 py-3.5 rounded-full bg-[#D93A2E]/10 text-[#B3261E] font-extrabold">
+            <button type="button" onClick={onDelete} className="px-5 py-3.5 rounded-full bg-[#7A2433]/10 text-[#7A2433] font-extrabold">
               Eliminar
             </button>
           )}
@@ -217,7 +217,7 @@ export function ConfirmDialog({ pending, onClose }: { pending: PendingConfirm; o
               pending.run();
               onClose();
             }}
-            className="flex-1 py-3 rounded-full bg-[#D93A2E] text-white font-extrabold"
+            className="flex-1 py-3 rounded-full bg-[#7A2433] text-white font-extrabold"
           >
             {pending.action}
           </button>
@@ -297,39 +297,33 @@ export function RhythmCurve({ values, today }: { values: number[]; today?: numbe
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label={`Pico de gasto el día ${peak + 1}: ${eur(values[peak])}`}>
       <defs>
         <linearGradient id="rhythm-fill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#FFD15C" stopOpacity="0.95" />
-          <stop offset="45%" stopColor="#EAA7E2" stopOpacity="0.85" />
-          <stop offset="85%" stopColor="#6A3BFF" stopOpacity="0.75" />
-          <stop offset="100%" stopColor="#6A3BFF" stopOpacity="0" />
+          <stop offset="0%" stopColor="#D9A441" stopOpacity="0.95" />
+          <stop offset="45%" stopColor="#A0673F" stopOpacity="0.85" />
+          <stop offset="85%" stopColor="#4A3428" stopOpacity="0.75" />
+          <stop offset="100%" stopColor="#4A3428" stopOpacity="0" />
         </linearGradient>
       </defs>
       <line x1={padX} x2={W - padX} y1={bottom} y2={bottom} stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
       <path d={area} fill="url(#rhythm-fill)" />
-      <path d={line} fill="none" stroke="#F4F1EC" strokeWidth="2.5" strokeLinecap="round" />
+      <path d={line} fill="none" stroke="#F6F1EA" strokeWidth="1.75" strokeLinecap="round" />
       <line x1={peakX} x2={peakX} y1={peakY} y2={bottom} stroke="rgba(255,255,255,0.55)" strokeWidth="1" />
-      <text x={labelX} y={peakY - 22} textAnchor="middle" fill="#9A9A9A" fontSize="9" fontFamily="var(--font-mono)" letterSpacing="0.6">PICO</text>
-      <text x={labelX} y={peakY - 9} textAnchor="middle" fill="#F4F1EC" fontSize="11" fontWeight="700" fontFamily="var(--font-mono)">
+      <text x={labelX} y={peakY - 22} textAnchor="middle" fill="#A39B92" fontSize="9" fontFamily="var(--font-mono)" letterSpacing="0.6">PICO</text>
+      <text x={labelX} y={peakY - 9} textAnchor="middle" fill="#F6F1EA" fontSize="11" fontWeight="700" fontFamily="var(--font-mono)">
         DÍA {peak + 1} · {eur(values[peak]).replace(/,\d\d/, '')}
       </text>
       {today !== undefined && today >= 1 && today <= n && (
         <g>
-          <line x1={x(today - 1)} x2={x(today - 1)} y1={top - 6} y2={bottom} stroke="#F5B13D" strokeWidth="1" strokeDasharray="3 3" />
-          <text x={x(today - 1)} y={bottom + 16} textAnchor="middle" fill="#F5B13D" fontSize="9" fontFamily="var(--font-mono)">HOY</text>
+          <line x1={x(today - 1)} x2={x(today - 1)} y1={top - 6} y2={bottom} stroke="#D9A441" strokeWidth="1" strokeDasharray="3 3" />
+          <text x={x(today - 1)} y={bottom + 16} textAnchor="middle" fill="#D9A441" fontSize="9" fontFamily="var(--font-mono)">HOY</text>
         </g>
       )}
-      <text x={padX} y={bottom + 16} fill="#9A9A9A" fontSize="9" fontFamily="var(--font-mono)">1</text>
-      <text x={W - padX} y={bottom + 16} textAnchor="end" fill="#9A9A9A" fontSize="9" fontFamily="var(--font-mono)">{n}</text>
+      <text x={padX} y={bottom + 16} fill="#A39B92" fontSize="9" fontFamily="var(--font-mono)">1</text>
+      <text x={W - padX} y={bottom + 16} textAnchor="end" fill="#A39B92" fontSize="9" fontFamily="var(--font-mono)">{n}</text>
     </svg>
   );
 }
 
-/** Escenas de fondo: una por pestaña, con fundido entre ellas. */
-export function Scenes({ active }: { active: string }) {
-  return (
-    <div className="scenes" aria-hidden="true">
-      {['gastos', 'ahorro', 'consejos', 'aprende'].map((s) => (
-        <div key={s} className={`scene scene-${s}`} style={{ opacity: active === s ? 1 : 0 }} />
-      ))}
-    </div>
-  );
+/** Fondo: luz cálida y tenue, la misma en todas las pestañas para no distraer. */
+export function Scenes() {
+  return <div className="scenes" aria-hidden="true" />;
 }
