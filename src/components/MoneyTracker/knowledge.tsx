@@ -55,6 +55,12 @@ const STEPS: Step[] = [
   },
 ];
 
+/** Pasos de la ruta completados (automáticos y marcados a mano). */
+export function routeProgress(state: MoneyState, now = new Date()) {
+  const done = STEPS.filter((s) => (s.auto ? s.auto(state, now) : !!state.checks[s.id])).length;
+  return { done, total: STEPS.length };
+}
+
 /* ------------------------------------------------------------------ */
 /* Lecciones                                                           */
 /* ------------------------------------------------------------------ */

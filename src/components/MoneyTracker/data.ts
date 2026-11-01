@@ -33,6 +33,8 @@ export type SavingsBucket = {
   color: string;
   /** Cuenta como inversión (fondos, bolsa, planes…) */
   invest: boolean;
+  /** Si es un objetivo (un viaje, un capricho…): cuánto necesitas y para cuándo */
+  goal?: { target: number; date: string };
 };
 
 /** Dinero apartado: puntual o transferencia automática mensual. */
@@ -69,6 +71,8 @@ export type MoneyState = {
   income: Record<string, number>;
   /** Pasos de la ruta de Aprende marcados a mano */
   checks: Record<string, boolean>;
+  /** Recordatorios ya añadidos al calendario: clave del evento → firma de su contenido */
+  calendarSynced: Record<string, string>;
 };
 
 /* ------------------------------------------------------------------ */
@@ -245,6 +249,37 @@ export function incomeFor(income: Record<string, number>, y: number, m: number):
   return best ? income[best] : null;
 }
 
+/** Estado de un objetivo de ahorro a fecha `now`. */
+export function goalStatus(b: SavingsBucket, savings: SavingEntry[], now = new Date()) {
+  if (!b.goal) return null;
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  // lo ahorrado hasta hoy (las aportaciones futuras de este mes no cuentan todavía)
+  let saved = 0;
+  for (const s of savings) {
+    if (s.bucket !== b.id) continue;
+    const st = parseDate(s.date);
+    const start = new Date(st.y, st.m, st.d);
+    if (start > today) continue;
+    if (!s.recurring) {
+      saved += s.amount;
+      continue;
+    }
+    let times = (today.getFullYear() - st.y) * 12 + (today.getMonth() - st.m) + 1;
+    if (Math.min(st.d, daysInMonth(today.getFullYear(), today.getMonth())) > today.getDate()) times -= 1;
+    saved += s.amount * Math.max(times, 0);
+  }
+  const g = parseDate(b.goal.date);
+  const deadline = new Date(g.y, g.m, g.d);
+  const daysLeft = Math.round((deadline.getTime() - today.getTime()) / 86400000);
+  const monthsLeft = Math.max((g.y - today.getFullYear()) * 12 + (g.m - today.getMonth()) + (g.d >= today.getDate() ? 0 : -1), 0);
+  const remaining = Math.max(b.goal.target - saved, 0);
+  const perMonthNeeded = remaining > 0 ? remaining / Math.max(monthsLeft, 1) : 0;
+  const monthlyPlanned = savings.filter((s) => s.bucket === b.id && s.recurring).reduce((a, s) => a + s.amount, 0);
+  const status: 'done' | 'overdue' | 'behind' | 'ok' =
+    remaining <= 0 ? 'done' : daysLeft < 0 ? 'overdue' : monthlyPlanned * Math.max(monthsLeft, 1) >= remaining ? 'ok' : 'behind';
+  return { saved, target: b.goal.target, remaining, daysLeft, monthsLeft, perMonthNeeded, monthlyPlanned, deadline, status, pct: Math.min(saved / b.goal.target, 1) };
+}
+
 /** Ahorro acumulado de cada destino hasta el final del mes (y, m), incluido. */
 export function savingsTotals(savings: SavingEntry[], y: number, m: number) {
   const target = y * 12 + m;
@@ -299,6 +334,7 @@ export function seedData(): MoneyState {
   const recurring: [string, number, string, number, ExpenseIcon?][] = [
     ['Alquiler', 650, 'hogar', 1, emoji('🔑', '#A0673F')],
     ['Luz', 45.3, 'hogar', 3, emoji('💡', '#F0D27A')],
+    ['Gas', 34.5, 'hogar', 28, emoji('🔥', '#A0673F')],
     ['Netflix', 13.99, 'suscripciones', 5],
     ['DIGI', 20, 'hogar', 7, emoji('📶', '#4A3B31')],
     ['Spotify', 11.99, 'suscripciones', 10],
@@ -364,14 +400,22 @@ export function seedData(): MoneyState {
     { id: uid(), name: 'Colchón inicial', amount: 1800, bucket: 'emergencia', date: daysAgo(200), recurring: false },
     { id: uid(), name: 'Fondo indexado mundial', amount: 150, bucket: 'inversion', date: startOfRecurring(2), recurring: true },
     { id: uid(), name: 'Hucha emergencias', amount: 100, bucket: 'emergencia', date: startOfRecurring(2), recurring: true },
-    { id: uid(), name: 'Viaje a Japón', amount: 60, bucket: 'objetivos', date: startOfRecurring(2), recurring: true },
+    { id: uid(), name: 'Hucha del viaje', amount: 60, bucket: 'viaje', date: startOfRecurring(2), recurring: true },
+    { id: uid(), name: 'Extra para el viaje', amount: 150, bucket: 'viaje', date: daysAgo(25), recurring: false },
     { id: uid(), name: 'Bonus extra', amount: 120, bucket: 'inversion', date: daysAgo(40), recurring: false },
     { id: uid(), name: 'Redondeos', amount: 25.4, bucket: 'colchon', date: daysAgo(20), recurring: false },
   ];
   const incomeStart = new Date(today.getFullYear(), today.getMonth() - 3, 1);
   const income = { [monthKey(incomeStart.getFullYear(), incomeStart.getMonth())]: 1950 };
 
-  return { expenses, paid, categories: DEFAULT_CATEGORIES, buckets: DEFAULT_BUCKETS, savings, income, checks: {} };
+  // Objetivo de ejemplo: un viaje el próximo enero
+  const tripYear = today.getMonth() === 0 && today.getDate() < 20 ? today.getFullYear() : today.getFullYear() + 1;
+  const buckets: SavingsBucket[] = [
+    ...DEFAULT_BUCKETS,
+    { id: 'viaje', label: 'Viaje de enero', emoji: '🧳', color: '#6E4430', invest: false, goal: { target: 900, date: `${tripYear}-01-20` } },
+  ];
+
+  return { expenses, paid, categories: DEFAULT_CATEGORIES, buckets, savings, income, checks: {}, calendarSynced: {} };
 }
 
 /** Solo la parte de ahorro de los datos de ejemplo. */
@@ -394,6 +438,7 @@ function normalizeState(raw: Partial<MoneyState>): MoneyState {
     savings: raw.savings ?? [],
     income: raw.income ?? {},
     checks: raw.checks ?? {},
+    calendarSynced: raw.calendarSynced ?? {},
   };
 }
 

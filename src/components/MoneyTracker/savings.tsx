@@ -312,9 +312,10 @@ export function SavingsView({ state, setState, y, m, setPending }: Props) {
   );
 }
 
-function SavingSheet({
+export function SavingSheet({
   initial,
   buckets,
+  defaultBucket,
   defaultDate,
   onSave,
   onDelete,
@@ -322,6 +323,7 @@ function SavingSheet({
 }: {
   initial?: SavingEntry;
   buckets: SavingsBucket[];
+  defaultBucket?: string;
   defaultDate: string;
   onSave: (e: SavingEntry) => void;
   onDelete?: () => void;
@@ -329,7 +331,7 @@ function SavingSheet({
 }) {
   const [name, setName] = useState(initial?.name ?? '');
   const [amount, setAmount] = useState(initial ? String(initial.amount).replace('.', ',') : '');
-  const [bucket, setBucket] = useState(initial?.bucket ?? buckets[0]?.id ?? FALLBACK_BUCKET_ID);
+  const [bucket, setBucket] = useState(initial?.bucket ?? defaultBucket ?? buckets[0]?.id ?? FALLBACK_BUCKET_ID);
   const [date, setDate] = useState(initial?.date ?? defaultDate);
   const [recurring, setRecurring] = useState(initial?.recurring ?? false);
   const value = parseFloat(amount.replace(',', '.'));
