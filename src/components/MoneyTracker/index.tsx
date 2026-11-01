@@ -3,126 +3,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useHasHydrated } from '../../lib/useHasHydrated';
 import {
-  FALLBACK_CATEGORY_ID, SWATCHES, daysInMonth, detectBrand, eur, expensesForMonth, loadState, monthKey,
+  FALLBACK_CATEGORY_ID, daysInMonth, detectBrand, eur, expensesForMonth, loadState, monthKey,
   monthLong, monthShort, pad, saveState, seedData, uid,
   type Category, type Expense, type ExpenseIcon, type MoneyState,
 } from './data';
-import { EmojiColorPicker, IconPicker, IconTile, resolveIcon } from './icons';
+import { IconPicker, IconTile, resolveIcon } from './icons';
+import { CheckMark, ConfirmDialog, Donut, GroupSheet, PaidToggle, Segmented, Sheet, ToggleRow, type Group, type PendingConfirm } from './ui';
+import { SavingsView } from './savings';
+import { AdviceView } from './advice';
+
+type Tab = 'gastos' | 'ahorro' | 'consejos';
 
 const WEEKDAYS = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'];
-
-/* ------------------------------------------------------------------ */
-/* Piezas pequeñas                                                     */
-/* ------------------------------------------------------------------ */
-
-function CheckMark({ size = 14, color = 'currentColor' }: { size?: number; color?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke={color} strokeWidth={3.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M4.5 12.5l5 5L19.5 7" />
-    </svg>
-  );
-}
-
-/** Botón de "pagado" táctil: cuadrado hundido cuando está marcado. */
-function PaidToggle({ paid, onClick, label }: { paid: boolean; onClick: () => void; label: string }) {
-  return (
-    <button
-      onClick={onClick}
-      aria-pressed={paid}
-      aria-label={label}
-      className={`w-10 h-10 rounded-[13px] flex items-center justify-center shrink-0 transition-all duration-150 ${
-        paid
-          ? 'bg-ink text-paper shadow-[inset_0_2px_0_rgba(255,255,255,0.12)] translate-y-[1px]'
-          : 'bg-paper border-2 border-ink/80 shadow-[0_3px_0_rgba(17,17,17,0.85)] hover:-translate-y-[1px] active:translate-y-[2px] active:shadow-none'
-      }`}
-    >
-      {paid && <CheckMark size={18} />}
-    </button>
-  );
-}
-
-function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/55 backdrop-blur-[2px]" onClick={onClose} role="dialog" aria-modal="true" aria-label={title}>
-      <div
-        className="sheet w-full sm:max-w-md max-h-[92%] overflow-y-auto bg-paper text-ink rounded-t-[32px] sm:rounded-[32px] p-5 space-y-4 shadow-2xl"
-        onClick={(ev) => ev.stopPropagation()}
-      >
-        <div className="flex items-center justify-between">
-          <h3 className="display text-2xl">{title}</h3>
-          <button onClick={onClose} className="w-9 h-9 rounded-full bg-ink/8 text-xl leading-none" aria-label="Cerrar">
-            ×
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function Donut({
-  slices,
-  total,
-  selected,
-  onSelect,
-}: {
-  slices: { cat: Category; value: number }[];
-  total: number;
-  selected: string | null;
-  onSelect: (id: string | null) => void;
-}) {
-  const r = 72;
-  const stroke = 30;
-  const C = 2 * Math.PI * r;
-  const gap = slices.length > 1 ? 4 : 0;
-  let offset = 0;
-  const sel = selected ? slices.find((s) => s.cat.id === selected) : null;
-
-  return (
-    <div className="relative w-full max-w-[250px] aspect-square mx-auto">
-      <svg viewBox="0 0 200 200" className="w-full h-full -rotate-90">
-        <circle cx="100" cy="100" r={r} fill="none" stroke="#262626" strokeWidth={stroke} />
-        {total > 0 &&
-          slices.map((s) => {
-            const len = (s.value / total) * C;
-            const dash = Math.max(len - gap, 0.5);
-            const el = (
-              <circle
-                key={s.cat.id}
-                cx="100"
-                cy="100"
-                r={r}
-                fill="none"
-                stroke={s.cat.color}
-                strokeWidth={selected === s.cat.id ? stroke + 8 : stroke}
-                strokeDasharray={`${dash} ${C - dash}`}
-                strokeDashoffset={-offset}
-                opacity={selected && selected !== s.cat.id ? 0.25 : 1}
-                className="cursor-pointer transition-all duration-300"
-                onClick={() => onSelect(selected === s.cat.id ? null : s.cat.id)}
-              />
-            );
-            offset += len;
-            return el;
-          })}
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none px-14">
-        {sel ? (
-          <>
-            <span className="text-3xl leading-none">{sel.cat.emoji}</span>
-            <span className="display text-xl text-paper mt-1">{eur(sel.value)}</span>
-            <span className="mono text-[11px] text-amber">{Math.round((sel.value / total) * 100)}% · {sel.cat.label.toUpperCase()}</span>
-          </>
-        ) : (
-          <>
-            <span className="mono text-[11px] text-mute">TODAS LAS CATEGORÍAS</span>
-            <span className="display text-2xl text-paper mt-1">{eur(total)}</span>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
 
 /* ------------------------------------------------------------------ */
 /* Componente principal                                                */
@@ -144,12 +36,13 @@ function MoneyTrackerInner() {
     const now = new Date();
     return { y: now.getFullYear(), m: now.getMonth() };
   });
+  const [tab, setTab] = useState<Tab>('gastos');
   const [view, setView] = useState<'calendario' | 'categorias'>('calendario');
   const [selectedCat, setSelectedCat] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [editor, setEditor] = useState<EditorState | null>(null);
   const [catEditor, setCatEditor] = useState<CategoryEditorState | null>(null);
-  const [pending, setPending] = useState<{ message: string; action: string; run: () => void } | null>(null);
+  const [pending, setPending] = useState<PendingConfirm | null>(null);
 
   useEffect(() => saveState(state), [state]);
 
@@ -228,7 +121,8 @@ function MoneyTrackerInner() {
       },
     });
 
-  const saveCategory = (c: Category) => {
+  const saveCategory = (g: Group, essential: boolean) => {
+    const c: Category = { ...g, essential };
     setState((s) => {
       const exists = s.categories.some((x) => x.id === c.id);
       return { ...s, categories: exists ? s.categories.map((x) => (x.id === c.id ? c : x)) : [...s.categories, c] };
@@ -259,11 +153,11 @@ function MoneyTrackerInner() {
     setPending({
       message:
         mode === 'demo'
-          ? '¿Cargar los datos de ejemplo? Se perderán los gastos actuales.'
-          : '¿Borrar todos los gastos y empezar de cero? Las categorías se mantienen.',
+          ? '¿Cargar los datos de ejemplo? Se perderán tus gastos y ahorros actuales.'
+          : '¿Borrar todos los gastos, ahorros e ingresos y empezar de cero? Las categorías y destinos se mantienen.',
       action: mode === 'demo' ? 'Cargar ejemplo' : 'Borrar todo',
       run: () => {
-        setState((s) => (mode === 'demo' ? seedData() : { expenses: [], paid: {}, categories: s.categories }));
+        setState((s) => (mode === 'demo' ? seedData() : { ...s, expenses: [], paid: {}, savings: [], income: {} }));
         setSelectedDay(null);
         setSelectedCat(null);
         const today = new Date();
@@ -299,7 +193,7 @@ function MoneyTrackerInner() {
 
   return (
     <div className="space-y-6 pb-28">
-      {/* ---------- Cabecera ---------- */}
+      {/* ---------- Mes y secciones ---------- */}
       <section className="space-y-4">
         <div className="flex items-center gap-3">
           <button onClick={() => moveMonth(-1)} className="nav-btn" aria-label="Mes anterior">‹</button>
@@ -309,7 +203,23 @@ function MoneyTrackerInner() {
           <button onClick={() => moveMonth(1)} className="nav-btn" aria-label="Mes siguiente">›</button>
           <span className="flex-1 h-[2px] bg-gradient-to-r from-amber to-transparent rounded-full" aria-hidden="true" />
         </div>
+        <Segmented<Tab>
+          options={[
+            { id: 'gastos', label: 'Gastos' },
+            { id: 'ahorro', label: 'Ahorro' },
+            { id: 'consejos', label: 'Consejos' },
+          ]}
+          value={tab}
+          onChange={setTab}
+        />
+      </section>
 
+      {tab === 'ahorro' && <SavingsView state={state} setState={setState} y={y} m={m} setPending={setPending} />}
+      {tab === 'consejos' && <AdviceView state={state} y={y} m={m} onGo={setTab} />}
+
+      {tab === 'gastos' && (
+      <>
+      <section className="space-y-4">
         <div>
           <p className="display text-[clamp(3rem,15vw,4.75rem)] leading-[0.9] text-ink tabular-nums">{eur(total)}</p>
           <p className="display text-2xl text-ink/80 mt-1">
@@ -330,20 +240,15 @@ function MoneyTrackerInner() {
         </div>
       </section>
 
-      {/* ---------- Selector de vista ---------- */}
-      <div className="grid grid-cols-2 gap-1 p-1 rounded-full bg-slab shadow-[0_8px_24px_rgba(0,0,0,0.25)]">
-        {(['calendario', 'categorias'] as const).map((v) => (
-          <button
-            key={v}
-            onClick={() => setView(v)}
-            className={`py-3 rounded-full text-sm font-extrabold transition-all ${
-              view === v ? 'bg-paper text-ink' : 'text-mute hover:text-paper'
-            }`}
-          >
-            {v === 'calendario' ? 'Calendario' : 'Categorías'}
-          </button>
-        ))}
-      </div>
+      <Segmented
+        size="sm"
+        options={[
+          { id: 'calendario', label: 'Calendario' },
+          { id: 'categorias', label: 'Categorías' },
+        ]}
+        value={view}
+        onChange={setView}
+      />
 
       {/* ---------- Calendario ---------- */}
       {view === 'calendario' && (
@@ -515,17 +420,19 @@ function MoneyTrackerInner() {
         })}
       </section>
 
-      {/* ---------- Datos de la demo ---------- */}
-      <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 pt-2 mono text-[11px] text-ink/55">
-        <button onClick={() => resetData('demo')} className="hover:text-ink underline-offset-4 hover:underline">CARGAR DATOS DE EJEMPLO</button>
-        <button onClick={() => resetData('vacio')} className="hover:text-[#B3261E] underline-offset-4 hover:underline">EMPEZAR DE CERO</button>
-      </div>
-
       {/* ---------- Botón principal ---------- */}
       <div className="fab-wrap">
         <button onClick={() => setEditor({ mode: 'new' })} className="fab" aria-label="Añadir gasto">
           <span className="text-4xl leading-none font-black">+</span>
         </button>
+      </div>
+      </>
+      )}
+
+      {/* ---------- Datos de la demo ---------- */}
+      <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 pt-2 mono text-[11px] text-ink/55">
+        <button onClick={() => resetData('demo')} className="hover:text-ink underline-offset-4 hover:underline">CARGAR DATOS DE EJEMPLO</button>
+        <button onClick={() => resetData('vacio')} className="hover:text-[#B3261E] underline-offset-4 hover:underline">EMPEZAR DE CERO</button>
       </div>
 
       {/* ---------- Hojas ---------- */}
@@ -543,8 +450,14 @@ function MoneyTrackerInner() {
       )}
 
       {catEditor && (
-        <CategorySheet
+        <GroupSheet
+          kind="categoría"
           initial={catEditor.mode === 'edit' ? catEditor.category : undefined}
+          toggle={{
+            label: 'Es un gasto necesario',
+            hint: 'Cuenta como «necesidad» en la regla 50/30/20 (si no, como capricho).',
+            value: catEditor.mode === 'edit' ? !!catEditor.category.essential : false,
+          }}
           onSave={saveCategory}
           onDelete={
             catEditor.mode === 'edit' && catEditor.category.id !== FALLBACK_CATEGORY_ID
@@ -555,27 +468,7 @@ function MoneyTrackerInner() {
         />
       )}
 
-      {pending && (
-        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 p-4" onClick={() => setPending(null)} role="alertdialog" aria-modal="true">
-          <div className="w-full max-w-sm bg-paper text-ink rounded-[28px] p-5 space-y-4 shadow-2xl" onClick={(ev) => ev.stopPropagation()}>
-            <p className="font-bold leading-snug">{pending.message}</p>
-            <div className="flex gap-3">
-              <button onClick={() => setPending(null)} className="flex-1 py-3 rounded-full bg-ink/8 font-bold" autoFocus>
-                Cancelar
-              </button>
-              <button
-                onClick={() => {
-                  pending.run();
-                  setPending(null);
-                }}
-                className="flex-1 py-3 rounded-full bg-[#D93A2E] text-white font-extrabold"
-              >
-                {pending.action}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {pending && <ConfirmDialog pending={pending} onClose={() => setPending(null)} />}
     </div>
   );
 }
@@ -689,20 +582,7 @@ function ExpenseSheet({
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setRecurring((r) => !r)}
-          className="w-full flex items-center gap-3 p-3 rounded-2xl bg-white/50 border border-ink/10 text-left"
-          aria-pressed={recurring}
-        >
-          <span className={`w-7 h-7 rounded-[9px] flex items-center justify-center ${recurring ? 'bg-ink text-paper' : 'border-2 border-ink/70'}`}>
-            {recurring && <CheckMark size={14} />}
-          </span>
-          <span className="text-sm">
-            <b>Se repite cada mes</b>
-            <span className="block text-ink/60 text-xs">Suscripciones, recibos, alquiler…</span>
-          </span>
-        </button>
+        <ToggleRow label="Se repite cada mes" hint="Suscripciones, recibos, alquiler…" value={recurring} onChange={setRecurring} />
 
         <div className="flex gap-3">
           {onDelete && (
@@ -712,63 +592,6 @@ function ExpenseSheet({
           )}
           <button type="submit" disabled={!valid} className="btn-3d flex-1">
             {initial ? 'Guardar cambios' : 'Añadir gasto'}
-          </button>
-        </div>
-      </form>
-    </Sheet>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Hoja: añadir / editar categoría                                     */
-/* ------------------------------------------------------------------ */
-
-function CategorySheet({
-  initial,
-  onSave,
-  onDelete,
-  onClose,
-}: {
-  initial?: Category;
-  onSave: (c: Category) => void;
-  onDelete?: () => void;
-  onClose: () => void;
-}) {
-  const [label, setLabel] = useState(initial?.label ?? '');
-  const [emoji, setEmoji] = useState(initial?.emoji ?? '✨');
-  const [color, setColor] = useState(initial?.color ?? SWATCHES[0]);
-  const valid = label.trim() !== '';
-
-  return (
-    <Sheet title={initial ? 'Editar categoría' : 'Nueva categoría'} onClose={onClose}>
-      <form
-        className="space-y-4"
-        onSubmit={(ev) => {
-          ev.preventDefault();
-          if (!valid) return;
-          onSave({ id: initial?.id ?? `cat_${uid()}`, label: label.trim(), emoji, color });
-        }}
-      >
-        <div className="flex items-center gap-3">
-          <IconTile icon={{ kind: 'emoji', emoji, color }} size={60} />
-          <input id="category-name" className="field flex-1 text-base font-bold" placeholder="Nombre (ej. Mascotas)" value={label} onChange={(e) => setLabel(e.target.value)} autoFocus={!initial} />
-        </div>
-        <EmojiColorPicker
-          emoji={emoji}
-          color={color}
-          onChange={(em, c) => {
-            setEmoji(em);
-            setColor(c);
-          }}
-        />
-        <div className="flex gap-3">
-          {onDelete && (
-            <button type="button" onClick={onDelete} className="px-5 py-3.5 rounded-full bg-[#D93A2E]/10 text-[#B3261E] font-extrabold">
-              Eliminar
-            </button>
-          )}
-          <button type="submit" disabled={!valid} className="btn-3d flex-1">
-            {initial ? 'Guardar cambios' : 'Crear categoría'}
           </button>
         </div>
       </form>
