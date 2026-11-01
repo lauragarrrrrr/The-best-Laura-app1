@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -15,6 +15,14 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "The best Laura · Gastos",
   description: "Control de gastos, suscripciones y pagos mensuales",
+  appleWebApp: {
+    title: "Gastos",
+    statusBarStyle: "black",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#1A120B",
 };
 
 export default function RootLayout({

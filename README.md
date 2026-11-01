@@ -9,6 +9,9 @@ App personal para controlar gastos y suscripciones, hecha con Next.js.
 - **Categorías:** gráfico circular y lista con el porcentaje de cada categoría (Hogar, Alimentación, Ocio y viajes…).
 - **Añadir gastos:** puntuales o mensuales (suscripciones, recibos, alquiler).
 
+- **Datos de ejemplo:** la primera vez se cargan 3 meses de gastos realistas. Al final de la página puedes *Cargar datos de ejemplo* de nuevo o *Empezar de cero*.
+- **Instalable en el móvil:** desde Safari, *Compartir → Añadir a pantalla de inicio* (o *Instalar app* en Chrome) y se abre a pantalla completa con su propio icono.
+
 Los datos se guardan en el navegador (`localStorage`), así que no se comparten entre dispositivos.
 
 ## Arrancar en local

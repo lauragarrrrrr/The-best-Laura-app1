@@ -45,7 +45,7 @@ const CATEGORIES: Record<CategoryId, { label: string; color: string; icon: strin
 };
 
 const CATEGORY_IDS = Object.keys(CATEGORIES) as CategoryId[];
-const STORAGE_KEY = 'tbl_money_v1';
+const STORAGE_KEY = 'tbl_money_v2';
 const WEEKDAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 
 /* ------------------------------------------------------------------ */
@@ -56,8 +56,14 @@ const pad = (n: number) => String(n).padStart(2, '0');
 const monthKey = (y: number, m: number) => `${y}-${pad(m + 1)}`;
 const daysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
 
-const eur = (n: number) =>
-  n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2 });
+// `useGrouping: 'always'` para que 1052 se muestre como "1.052" (es-ES no agrupa 4 cifras por defecto)
+const eurFormat = new Intl.NumberFormat('es-ES', {
+  style: 'currency',
+  currency: 'EUR',
+  minimumFractionDigits: 2,
+  useGrouping: 'always',
+} as Intl.NumberFormatOptions);
+const eur = (n: number) => eurFormat.format(n);
 
 const monthLabel = (y: number, m: number) =>
   new Date(y, m, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
@@ -91,28 +97,78 @@ function colorFromName(name: string) {
   return `hsl(${h} 65% 55%)`;
 }
 
+/** Datos de ejemplo realistas: 3 meses de historial relativos a hoy. */
 function seedData(): MoneyState {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = now.getMonth();
-  const d = (day: number, monthOffset = 0) => {
-    const date = new Date(y, m + monthOffset, day);
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-  };
-  const expenses: Expense[] = [
-    { id: uid(), name: 'Alquiler', amount: 750, category: 'hogar', date: d(1, -2), recurring: true },
-    { id: uid(), name: 'Netflix', amount: 13.99, category: 'suscripciones', date: d(5, -2), recurring: true },
-    { id: uid(), name: 'DIGI', amount: 20, category: 'hogar', date: d(7, -2), recurring: true },
-    { id: uid(), name: 'Spotify', amount: 11.99, category: 'suscripciones', date: d(10, -2), recurring: true },
-    { id: uid(), name: 'Gimnasio', amount: 39.9, category: 'salud', date: d(12, -2), recurring: true },
-    { id: uid(), name: 'Supermercado', amount: 86.4, category: 'alimentacion', date: d(4), recurring: false },
-    { id: uid(), name: 'Mercadona', amount: 62.15, category: 'alimentacion', date: d(14), recurring: false },
-    { id: uid(), name: 'Cena con amigas', amount: 38, category: 'ocio', date: d(9), recurring: false },
-    { id: uid(), name: 'Abono transporte', amount: 20, category: 'transporte', date: d(2), recurring: false },
-    { id: uid(), name: 'Supermercado', amount: 120.3, category: 'alimentacion', date: d(6, -1), recurring: false },
-    { id: uid(), name: 'Escapada finde', amount: 180, category: 'ocio', date: d(18, -1), recurring: false },
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const iso = (date: Date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  const daysAgo = (n: number) => iso(new Date(today.getFullYear(), today.getMonth(), today.getDate() - n));
+  const startOfRecurring = (day: number) => iso(new Date(today.getFullYear(), today.getMonth() - 3, day));
+
+  const recurring: [string, number, CategoryId, number][] = [
+    ['Alquiler', 650, 'hogar', 1],
+    ['Luz', 45.3, 'hogar', 3],
+    ['Netflix', 13.99, 'suscripciones', 5],
+    ['DIGI', 20, 'hogar', 7],
+    ['Spotify', 11.99, 'suscripciones', 10],
+    ['Disney+', 9.99, 'suscripciones', 11],
+    ['Gimnasio', 39.9, 'salud', 12],
+    ['iCloud', 2.99, 'suscripciones', 19],
+    ['Seguro del coche', 32.5, 'transporte', 22],
   ];
-  return { expenses, paid: {} };
+
+  // [concepto, importe, categoría, hace cuántos días]
+  const oneOff: [string, number, CategoryId, number][] = [
+    ['Mercadona', 64.2, 'alimentacion', 1],
+    ['Brunch', 24.5, 'ocio', 2],
+    ['Gasolina', 55, 'transporte', 4],
+    ['Lidl', 41.75, 'alimentacion', 6],
+    ['Zara', 49.95, 'compras', 8],
+    ['Cine', 17, 'ocio', 10],
+    ['Mercadona', 78.4, 'alimentacion', 13],
+    ['Farmacia', 12.6, 'salud', 15],
+    ['Cena con amigas', 38, 'ocio', 18],
+    ['Frutería', 18.3, 'alimentacion', 20],
+    ['Mercadona', 82.1, 'alimentacion', 24],
+    ['Gasolina', 52, 'transporte', 27],
+    ['Escapada a Valencia', 186, 'ocio', 31],
+    ['Mercadona', 71.35, 'alimentacion', 34],
+    ['Amazon', 34.99, 'compras', 37],
+    ['Lidl', 39.9, 'alimentacion', 41],
+    ['Concierto', 45, 'ocio', 44],
+    ['Mercadona', 88.6, 'alimentacion', 48],
+    ['Gasolina', 58, 'transporte', 52],
+    ['Mercadona', 69.8, 'alimentacion', 55],
+    ['Regalo cumpleaños', 40, 'compras', 58],
+    ['Cena', 32, 'ocio', 62],
+    ['Mercadona', 75.2, 'alimentacion', 66],
+    ['Fisioterapeuta', 45, 'salud', 70],
+  ];
+
+  const expenses: Expense[] = [
+    ...recurring.map(([name, amount, category, day]) => ({
+      id: uid(), name, amount, category, date: startOfRecurring(day), recurring: true,
+    })),
+    ...oneOff.map(([name, amount, category, ago]) => ({
+      id: uid(), name, amount, category, date: daysAgo(ago), recurring: false,
+    })),
+  ];
+
+  // Los recibos ya pasados aparecen como pagados; los que están por venir, pendientes.
+  const paid: Record<string, boolean> = {};
+  for (const e of expenses.filter((x) => x.recurring)) {
+    for (let back = 0; back <= 3; back++) {
+      const y = today.getFullYear();
+      const m = today.getMonth() - back;
+      const ref = new Date(y, m, 1);
+      const day = dayInMonth(e, ref.getFullYear(), ref.getMonth());
+      if (day === null) continue;
+      if (new Date(ref.getFullYear(), ref.getMonth(), day) < today || (back === 0 && day === today.getDate())) {
+        paid[`${e.id}:${monthKey(ref.getFullYear(), ref.getMonth())}`] = true;
+      }
+    }
+  }
+  return { expenses, paid };
 }
 
 /* ------------------------------------------------------------------ */
@@ -289,6 +345,19 @@ function MoneyTrackerInner() {
     setState((s) => ({ ...s, expenses: s.expenses.filter((e) => e.id !== id) }));
   };
 
+  const resetData = (mode: 'demo' | 'vacio') => {
+    const msg =
+      mode === 'demo'
+        ? '¿Cargar los datos de ejemplo? Se perderán los gastos actuales.'
+        : '¿Borrar todos los gastos y empezar de cero?';
+    if (!confirm(msg)) return;
+    setState(mode === 'demo' ? seedData() : { expenses: [], paid: {} });
+    setSelectedDay(null);
+    setSelectedCat(null);
+    const today = new Date();
+    setCursor({ y: today.getFullYear(), m: today.getMonth() });
+  };
+
   const addExpense = (e: Omit<Expense, 'id'>) => {
     setState((s) => ({ ...s, expenses: [...s.expenses, { ...e, id: uid() }] }));
     setShowForm(false);
@@ -328,7 +397,9 @@ function MoneyTrackerInner() {
           <span className="text-4xl md:text-5xl font-bold tracking-tight">{eur(total)}</span>
           {change !== null && (
             <span className={`text-sm font-semibold ${change > 0 ? 'text-[#EE6A4D]' : 'text-[#5ED68C]'}`}>
-              {change > 0 ? '↗' : '↘'} {Math.abs(change).toFixed(0)}% vs mes anterior
+              {change > 0 ? '↗' : '↘'} {Math.abs(change).toFixed(0)}% vs{' '}
+              {new Date(prev.y, prev.m, 1).toLocaleDateString('es-ES', { month: 'long' })}
+              {isCurrentMonth && <span className="text-foreground/40 font-normal"> · mes en curso</span>}
             </span>
           )}
         </div>
@@ -505,6 +576,16 @@ function MoneyTrackerInner() {
             </div>
           );
         })}
+      </div>
+
+      {/* Datos de la demo */}
+      <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 pt-4 text-xs text-foreground/40">
+        <button onClick={() => resetData('demo')} className="hover:text-accent underline-offset-4 hover:underline">
+          Cargar datos de ejemplo
+        </button>
+        <button onClick={() => resetData('vacio')} className="hover:text-[#EE6A4D] underline-offset-4 hover:underline">
+          Empezar de cero
+        </button>
       </div>
     </div>
   );
