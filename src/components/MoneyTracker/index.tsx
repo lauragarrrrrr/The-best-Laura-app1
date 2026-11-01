@@ -11,8 +11,9 @@ import { IconPicker, IconTile, resolveIcon } from './icons';
 import { CheckMark, ConfirmDialog, Donut, GroupSheet, PaidToggle, Segmented, Sheet, ToggleRow, type Group, type PendingConfirm } from './ui';
 import { SavingsView } from './savings';
 import { AdviceView } from './advice';
+import { KnowledgeView } from './knowledge';
 
-type Tab = 'gastos' | 'ahorro' | 'consejos';
+type Tab = 'gastos' | 'ahorro' | 'consejos' | 'aprende';
 
 const WEEKDAYS = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'];
 
@@ -96,6 +97,16 @@ function MoneyTrackerInner() {
     setCursor({ y: d.getFullYear(), m: d.getMonth() });
     setSelectedDay(null);
     setSelectedCat(null);
+  };
+
+  /** Cambia de pestaña y, si se indica, lleva la vista hasta un elemento (un libro, la biblioteca…). */
+  const goTo = (next: Tab, anchor?: string) => {
+    setTab(next);
+    if (anchor) {
+      setTimeout(() => document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'start' }), 60);
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   const togglePaid = (id: string) =>
@@ -208,6 +219,7 @@ function MoneyTrackerInner() {
             { id: 'gastos', label: 'Gastos' },
             { id: 'ahorro', label: 'Ahorro' },
             { id: 'consejos', label: 'Consejos' },
+            { id: 'aprende', label: 'Aprende' },
           ]}
           value={tab}
           onChange={setTab}
@@ -215,7 +227,8 @@ function MoneyTrackerInner() {
       </section>
 
       {tab === 'ahorro' && <SavingsView state={state} setState={setState} y={y} m={m} setPending={setPending} />}
-      {tab === 'consejos' && <AdviceView state={state} y={y} m={m} onGo={setTab} />}
+      {tab === 'consejos' && <AdviceView state={state} y={y} m={m} onGo={goTo} />}
+      {tab === 'aprende' && <KnowledgeView state={state} setState={setState} y={y} m={m} />}
 
       {tab === 'gastos' && (
       <>

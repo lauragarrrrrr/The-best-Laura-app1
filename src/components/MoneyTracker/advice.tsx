@@ -293,7 +293,7 @@ export function computeInsights(state: MoneyState, y: number, m: number, now = n
 /* Vista                                                               */
 /* ------------------------------------------------------------------ */
 
-export function AdviceView({ state, y, m, onGo }: { state: MoneyState; y: number; m: number; onGo: (tab: 'gastos' | 'ahorro') => void }) {
+export function AdviceView({ state, y, m, onGo }: { state: MoneyState; y: number; m: number; onGo: (tab: 'gastos' | 'ahorro' | 'aprende', anchor?: string) => void }) {
   const insights = useMemo(() => computeInsights(state, y, m), [state, y, m]);
   const alerts = insights.filter((i) => i.tone === 'alerta' || i.tone === 'aviso').length;
 
@@ -384,9 +384,9 @@ export function AdviceView({ state, y, m, onGo }: { state: MoneyState; y: number
                   <h3 className="font-extrabold leading-snug">{i.title}</h3>
                   <p className="text-sm text-ink/70 leading-relaxed">{i.text}</p>
                   {book && (
-                    <a href={`#libro-${book.id}`} className="inline-block mono text-[10px] text-ink/60 pt-1">
+                    <button onClick={() => onGo('aprende', `libro-${book.id}`)} className="block text-left mono text-[10px] text-ink/60 pt-1 underline-offset-2 hover:underline">
                       📖 {book.idea.toUpperCase()} · {book.author.split(' y ')[0].toUpperCase()}
-                    </a>
+                    </button>
                   )}
                 </div>
               </div>
@@ -395,43 +395,14 @@ export function AdviceView({ state, y, m, onGo }: { state: MoneyState; y: number
         })}
       </section>
 
-      {/* ---------- Biblioteca ---------- */}
-      <section className="space-y-3">
-        <div className="px-1">
-          <h2 className="display text-2xl text-ink">Biblioteca</h2>
-          <p className="text-sm text-ink/65">La idea principal de ocho libros clásicos sobre dinero, en dos frases y un paso práctico.</p>
-        </div>
-        <div className="-mx-4 px-4 overflow-x-auto snap-x snap-mandatory flex gap-3 pb-2" style={{ scrollbarWidth: 'none' }}>
-          {BOOKS.map((b) => (
-            <article id={`libro-${b.id}`} key={b.id} className="snap-start shrink-0 w-[78%] max-w-[300px] slab p-0 overflow-hidden flex flex-col scroll-mt-24">
-              <div className="p-4 pb-3 flex flex-col gap-2 min-h-[132px] justify-between" style={{ background: b.cover }}>
-                <span className="mono text-[10px] opacity-80" style={{ color: b.cover === '#2B2B2B' ? '#F4F1EC' : '#111111' }}>
-                  {b.author.toUpperCase()} · {b.year}
-                </span>
-                <h3 className="display text-[1.35rem] leading-[1.02]" style={{ color: b.cover === '#2B2B2B' ? '#F4F1EC' : '#111111' }}>
-                  {b.title}
-                </h3>
-                {b.original && (
-                  <span className="mono text-[9px] opacity-70" style={{ color: b.cover === '#2B2B2B' ? '#F4F1EC' : '#111111' }}>
-                    {b.original.toUpperCase()}
-                  </span>
-                )}
-              </div>
-              <div className="p-4 space-y-2 flex-1 flex flex-col">
-                <p className="display text-lg text-amber leading-tight">{b.idea}</p>
-                <p className="text-[13px] text-paper/80 leading-relaxed flex-1">{b.summary}</p>
-                <p className="text-[13px] text-paper leading-relaxed border-t border-[#2A2A2A] pt-2">
-                  <span className="mono text-[10px] text-amber block">PRUÉBALO</span>
-                  {b.apply}
-                </p>
-              </div>
-            </article>
-          ))}
-        </div>
-        <p className="mono text-[10px] text-ink/50 px-1 leading-relaxed">
-          IDEAS EDUCATIVAS RESUMIDAS CON PALABRAS PROPIAS. NO SON ASESORAMIENTO FINANCIERO PERSONALIZADO: ANTES DE INVERTIR, INFÓRMATE O CONSULTA A UN PROFESIONAL.
-        </p>
-      </section>
+      <button onClick={() => onGo('aprende', 'biblioteca')} className="slab w-full p-5 flex items-center gap-4 text-left">
+        <span className="text-3xl" aria-hidden="true">📚</span>
+        <span className="flex-1 min-w-0">
+          <span className="display text-xl text-paper block">¿Quieres entender el porqué?</span>
+          <span className="text-sm text-mute block">Lecciones, glosario, calculadora y la biblioteca de libros están en Aprende.</span>
+        </span>
+        <span className="text-amber text-2xl" aria-hidden="true">→</span>
+      </button>
     </div>
   );
 }
