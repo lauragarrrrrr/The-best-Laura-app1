@@ -230,7 +230,7 @@ export function ConfirmDialog({ pending, onClose }: { pending: PendingConfirm; o
 /** Pestañas tipo píldora sobre losa negra. */
 export function Segmented<T extends string>({ options, value, onChange, size = 'md' }: { options: { id: T; label: string }[]; value: T; onChange: (v: T) => void; size?: 'md' | 'sm' }) {
   return (
-    <div className="grid gap-1 p-1 rounded-full bg-slab shadow-[0_8px_24px_rgba(0,0,0,0.25)]" style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }} role="tablist">
+    <div className="grid gap-1 p-1 rounded-full bg-slab backdrop-blur-xl border border-white/10 shadow-[0_8px_24px_rgba(0,0,0,0.35)]" style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }} role="tablist">
       {options.map((o) => (
         <button
           key={o.id}
@@ -241,6 +241,94 @@ export function Segmented<T extends string>({ options, value, onChange, size = '
         >
           {o.label}
         </button>
+      ))}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Curva de ritmo: gasto por día suavizado, con pico y "hoy"           */
+/* ------------------------------------------------------------------ */
+
+export function RhythmCurve({ values, today }: { values: number[]; today?: number }) {
+  const n = values.length;
+  const W = 340;
+  const H = 170;
+  const padX = 10;
+  const top = 44;
+  const bottom = H - 26;
+
+  // suavizado gaussiano para que el ritmo se lea como olas, no como picos sueltos
+  const sigma = 2.1;
+  const smooth = values.map((_, i) => {
+    let acc = 0;
+    let wsum = 0;
+    for (let j = Math.max(0, i - 7); j <= Math.min(n - 1, i + 7); j++) {
+      const w = Math.exp(-((i - j) ** 2) / (2 * sigma * sigma));
+      acc += values[j] * w;
+      wsum += w;
+    }
+    return acc / wsum;
+  });
+  const max = Math.max(...smooth, 1);
+  const x = (i: number) => padX + (i / Math.max(n - 1, 1)) * (W - padX * 2);
+  const y = (v: number) => bottom - (v / max) * (bottom - top);
+  const pts = smooth.map((v, i) => [x(i), y(v)] as const);
+
+  let line = `M ${pts[0][0]} ${pts[0][1]}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] ?? pts[i];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[i + 2] ?? p2;
+    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+    const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+    line += ` C ${c1[0]} ${Math.min(c1[1], bottom)} ${c2[0]} ${Math.min(c2[1], bottom)} ${p2[0]} ${p2[1]}`;
+  }
+  const area = `${line} L ${pts[n - 1][0]} ${bottom} L ${pts[0][0]} ${bottom} Z`;
+
+  // el pico se marca en el día real de más gasto
+  const peak = values.reduce((best, v, i) => (v > values[best] ? i : best), 0);
+  const peakX = x(peak);
+  const peakY = y(smooth[peak]);
+  const labelX = Math.min(Math.max(peakX, 44), W - 44);
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label={`Pico de gasto el día ${peak + 1}: ${eur(values[peak])}`}>
+      <defs>
+        <linearGradient id="rhythm-fill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#FFD15C" stopOpacity="0.95" />
+          <stop offset="45%" stopColor="#EAA7E2" stopOpacity="0.85" />
+          <stop offset="85%" stopColor="#6A3BFF" stopOpacity="0.75" />
+          <stop offset="100%" stopColor="#6A3BFF" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <line x1={padX} x2={W - padX} y1={bottom} y2={bottom} stroke="rgba(255,255,255,0.12)" strokeWidth="1" />
+      <path d={area} fill="url(#rhythm-fill)" />
+      <path d={line} fill="none" stroke="#F4F1EC" strokeWidth="2.5" strokeLinecap="round" />
+      <line x1={peakX} x2={peakX} y1={peakY} y2={bottom} stroke="rgba(255,255,255,0.55)" strokeWidth="1" />
+      <text x={labelX} y={peakY - 22} textAnchor="middle" fill="#9A9A9A" fontSize="9" fontFamily="var(--font-mono)" letterSpacing="0.6">PICO</text>
+      <text x={labelX} y={peakY - 9} textAnchor="middle" fill="#F4F1EC" fontSize="11" fontWeight="700" fontFamily="var(--font-mono)">
+        DÍA {peak + 1} · {eur(values[peak]).replace(/,\d\d/, '')}
+      </text>
+      {today !== undefined && today >= 1 && today <= n && (
+        <g>
+          <line x1={x(today - 1)} x2={x(today - 1)} y1={top - 6} y2={bottom} stroke="#F5B13D" strokeWidth="1" strokeDasharray="3 3" />
+          <text x={x(today - 1)} y={bottom + 16} textAnchor="middle" fill="#F5B13D" fontSize="9" fontFamily="var(--font-mono)">HOY</text>
+        </g>
+      )}
+      <text x={padX} y={bottom + 16} fill="#9A9A9A" fontSize="9" fontFamily="var(--font-mono)">1</text>
+      <text x={W - padX} y={bottom + 16} textAnchor="end" fill="#9A9A9A" fontSize="9" fontFamily="var(--font-mono)">{n}</text>
+    </svg>
+  );
+}
+
+/** Escenas de fondo: una por pestaña, con fundido entre ellas. */
+export function Scenes({ active }: { active: string }) {
+  return (
+    <div className="scenes" aria-hidden="true">
+      {['gastos', 'ahorro', 'consejos', 'aprende'].map((s) => (
+        <div key={s} className={`scene scene-${s}`} style={{ opacity: active === s ? 1 : 0 }} />
       ))}
     </div>
   );

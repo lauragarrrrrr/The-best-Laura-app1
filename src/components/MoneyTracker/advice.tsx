@@ -314,10 +314,10 @@ export function AdviceView({ state, y, m, onGo }: { state: MoneyState; y: number
   return (
     <div className="space-y-6">
       <section>
-        <p className="display text-[clamp(3rem,15vw,4.75rem)] leading-[0.9] text-ink">
+        <p className="hero-num">
           {alerts} {alerts === 1 ? 'aviso' : 'avisos'}
         </p>
-        <p className="display text-2xl text-ink/80 mt-1">
+        <p className="hero-sub mt-2">
           y {insights.length - alerts} {insights.length - alerts === 1 ? 'idea' : 'ideas'} para {monthLong(y, m)}.
         </p>
       </section>
@@ -362,8 +362,8 @@ export function AdviceView({ state, y, m, onGo }: { state: MoneyState; y: number
       {/* ---------- Avisos y sugerencias ---------- */}
       <section className="space-y-3">
         <div className="flex items-baseline justify-between px-1">
-          <h2 className="display text-2xl text-ink">Avisos y sugerencias</h2>
-          <span className="mono text-xs text-ink/60">{monthShort(y, m)}</span>
+          <h2 className="page-h2">Avisos y sugerencias</h2>
+          <span className="page-meta">{monthShort(y, m)}</span>
         </div>
         {insights.map((i) => {
           const tone = TONE_STYLE[i.tone];
