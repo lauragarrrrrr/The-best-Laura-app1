@@ -16,7 +16,34 @@ export type ExpenseIcon =
   | { kind: 'brand'; slug: string }
   | { kind: 'emoji'; emoji: string; color: string };
 
-export type Category = { id: string; label: string; emoji: string; color: string };
+export type Category = {
+  id: string;
+  label: string;
+  emoji: string;
+  color: string;
+  /** Gasto necesario (vivienda, comida…) frente a capricho, para la regla 50/30/20 */
+  essential?: boolean;
+};
+
+/** Destino del ahorro (Inversión, Fondo de emergencia…). */
+export type SavingsBucket = {
+  id: string;
+  label: string;
+  emoji: string;
+  color: string;
+  /** Cuenta como inversión (fondos, bolsa, planes…) */
+  invest: boolean;
+};
+
+/** Dinero apartado: puntual o transferencia automática mensual. */
+export type SavingEntry = {
+  id: string;
+  name: string;
+  amount: number;
+  bucket: string;
+  date: string;
+  recurring: boolean;
+};
 
 export type Expense = {
   id: string;
@@ -36,6 +63,10 @@ export type MoneyState = {
   /** Pagos marcados como hechos: clave `${expenseId}:${YYYY-MM}` */
   paid: Record<string, boolean>;
   categories: Category[];
+  buckets: SavingsBucket[];
+  savings: SavingEntry[];
+  /** Ingresos netos por mes (`YYYY-MM`). Un mes sin valor usa el último anterior. */
+  income: Record<string, number>;
 };
 
 /* ------------------------------------------------------------------ */
@@ -43,17 +74,26 @@ export type MoneyState = {
 /* ------------------------------------------------------------------ */
 
 export const DEFAULT_CATEGORIES: Category[] = [
-  { id: 'hogar', label: 'Hogar', emoji: '🏠', color: '#5EC8E5' },
-  { id: 'alimentacion', label: 'Alimentación', emoji: '🍴', color: '#F5A300' },
+  { id: 'hogar', label: 'Hogar', emoji: '🏠', color: '#5EC8E5', essential: true },
+  { id: 'alimentacion', label: 'Alimentación', emoji: '🍴', color: '#F5A300', essential: true },
   { id: 'ocio', label: 'Ocio y viajes', emoji: '🎭', color: '#F2D24B' },
   { id: 'suscripciones', label: 'Suscripciones', emoji: '📺', color: '#E5484D' },
-  { id: 'transporte', label: 'Transporte', emoji: '🚗', color: '#8E7CF0' },
-  { id: 'salud', label: 'Salud y deporte', emoji: '💪', color: '#4CC38A' },
+  { id: 'transporte', label: 'Transporte', emoji: '🚗', color: '#8E7CF0', essential: true },
+  { id: 'salud', label: 'Salud y deporte', emoji: '💪', color: '#4CC38A', essential: true },
   { id: 'compras', label: 'Compras', emoji: '🛍️', color: '#E26AC1' },
   { id: 'otros', label: 'Otros', emoji: '📦', color: '#9A958E' },
 ];
 
 export const FALLBACK_CATEGORY_ID = 'otros';
+
+export const DEFAULT_BUCKETS: SavingsBucket[] = [
+  { id: 'inversion', label: 'Inversión', emoji: '📈', color: '#F5A300', invest: true },
+  { id: 'emergencia', label: 'Fondo de emergencia', emoji: '🛟', color: '#5EC8E5', invest: false },
+  { id: 'objetivos', label: 'Objetivos', emoji: '✈️', color: '#E26AC1', invest: false },
+  { id: 'colchon', label: 'Cuenta de ahorro', emoji: '🏦', color: '#4CC38A', invest: false },
+];
+export const EMERGENCY_BUCKET_ID = 'emergencia';
+export const FALLBACK_BUCKET_ID = 'colchon';
 
 /** Paleta para emojis y categorías personalizadas. */
 export const SWATCHES = [
@@ -187,23 +227,45 @@ export const monthShort = (y: number, m: number) =>
 export const monthLong = (y: number, m: number) =>
   new Date(y, m, 1).toLocaleDateString('es-ES', { month: 'long' });
 
+/** Ingresos de un mes: el valor de ese mes o el último anterior. */
+export function incomeFor(income: Record<string, number>, y: number, m: number): number | null {
+  const key = monthKey(y, m);
+  let best: string | null = null;
+  for (const k of Object.keys(income)) if (k <= key && (!best || k > best)) best = k;
+  return best ? income[best] : null;
+}
+
+/** Ahorro acumulado de cada destino hasta el final del mes (y, m), incluido. */
+export function savingsTotals(savings: SavingEntry[], y: number, m: number) {
+  const target = y * 12 + m;
+  const totals = new Map<string, number>();
+  for (const s of savings) {
+    const st = parseDate(s.date);
+    const start = st.y * 12 + st.m;
+    if (start > target) continue;
+    const times = s.recurring ? target - start + 1 : 1;
+    totals.set(s.bucket, (totals.get(s.bucket) ?? 0) + s.amount * times);
+  }
+  return totals;
+}
+
 export function parseDate(iso: string) {
   const [y, m, d] = iso.split('-').map(Number);
   return { y, m: m - 1, d };
 }
 
 /** Día del mes (y, m) en que cae el gasto, o null si no aplica ese mes. */
-export function dayInMonth(e: Expense, y: number, m: number): number | null {
+export function dayInMonth(e: Pick<Expense, 'date' | 'recurring'>, y: number, m: number): number | null {
   const start = parseDate(e.date);
   if (!e.recurring) return start.y === y && start.m === m ? start.d : null;
   if (y * 12 + m < start.y * 12 + start.m) return null;
   return Math.min(start.d, daysInMonth(y, m));
 }
 
-export function expensesForMonth(expenses: Expense[], y: number, m: number) {
+export function expensesForMonth<T extends Pick<Expense, 'date' | 'recurring'>>(expenses: T[], y: number, m: number) {
   return expenses
     .map((e) => ({ e, day: dayInMonth(e, y, m) }))
-    .filter((x): x is { e: Expense; day: number } => x.day !== null)
+    .filter((x): x is { e: T; day: number } => x.day !== null)
     .sort((a, b) => a.day - b.day);
 }
 
@@ -288,18 +350,50 @@ export function seedData(): MoneyState {
       }
     }
   }
-  return { expenses, paid, categories: DEFAULT_CATEGORIES };
+  const savings: SavingEntry[] = [
+    { id: uid(), name: 'Colchón inicial', amount: 1800, bucket: 'emergencia', date: daysAgo(200), recurring: false },
+    { id: uid(), name: 'Fondo indexado mundial', amount: 150, bucket: 'inversion', date: startOfRecurring(2), recurring: true },
+    { id: uid(), name: 'Hucha emergencias', amount: 100, bucket: 'emergencia', date: startOfRecurring(2), recurring: true },
+    { id: uid(), name: 'Viaje a Japón', amount: 60, bucket: 'objetivos', date: startOfRecurring(2), recurring: true },
+    { id: uid(), name: 'Bonus extra', amount: 120, bucket: 'inversion', date: daysAgo(40), recurring: false },
+    { id: uid(), name: 'Redondeos', amount: 25.4, bucket: 'colchon', date: daysAgo(20), recurring: false },
+  ];
+  const incomeStart = new Date(today.getFullYear(), today.getMonth() - 3, 1);
+  const income = { [monthKey(incomeStart.getFullYear(), incomeStart.getMonth())]: 1950 };
+
+  return { expenses, paid, categories: DEFAULT_CATEGORIES, buckets: DEFAULT_BUCKETS, savings, income };
+}
+
+/** Solo la parte de ahorro de los datos de ejemplo. */
+export function seedSavings(): Pick<MoneyState, 'buckets' | 'savings' | 'income'> {
+  const { buckets, savings, income } = seedData();
+  return { buckets, savings, income };
+}
+
+const ESSENTIAL_IDS = new Set(DEFAULT_CATEGORIES.filter((c) => c.essential).map((c) => c.id));
+
+/** Completa datos guardados por versiones anteriores. */
+function normalizeState(raw: Partial<MoneyState>): MoneyState {
+  return {
+    expenses: raw.expenses ?? [],
+    paid: raw.paid ?? {},
+    categories: (raw.categories ?? DEFAULT_CATEGORIES).map((c) =>
+      c.essential === undefined ? { ...c, essential: ESSENTIAL_IDS.has(c.id) } : c,
+    ),
+    buckets: raw.buckets ?? DEFAULT_BUCKETS,
+    savings: raw.savings ?? [],
+    income: raw.income ?? {},
+  };
 }
 
 export function loadState(): MoneyState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw) as MoneyState;
+    if (raw) return normalizeState(JSON.parse(raw) as Partial<MoneyState>);
     // Datos de la versión anterior: se conservan y se añaden las categorías
     const legacy = localStorage.getItem(LEGACY_KEY);
     if (legacy) {
-      const old = JSON.parse(legacy) as Omit<MoneyState, 'categories'>;
-      return { ...old, categories: DEFAULT_CATEGORIES };
+      return normalizeState(JSON.parse(legacy) as Partial<MoneyState>);
     }
   } catch {
     /* almacenamiento no disponible o datos corruptos */
