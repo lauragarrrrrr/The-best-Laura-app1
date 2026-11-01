@@ -2,23 +2,16 @@ import { MoneyTracker } from "@/components/MoneyTracker";
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-background text-foreground font-sans p-4 md:p-8">
-      <header className="mb-8 text-center">
-        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tighter text-accent mb-2">
-          The best Laura
-        </h1>
-        <p className="text-accent/60 uppercase tracking-widest text-xs font-semibold">
-          Control de gastos y suscripciones
-        </p>
-      </header>
-
-      <main className="w-full max-w-2xl mx-auto">
-        <MoneyTracker />
-      </main>
-
-      <footer className="mt-16 pt-6 border-t border-accent/10 text-center text-sm text-foreground/40">
-        &copy; 2026 The Best Laura
-      </footer>
+    <div className="min-h-screen px-4 pt-6 sm:pt-10">
+      <div className="w-full max-w-md mx-auto">
+        <header className="flex items-center justify-between mb-6">
+          <h1 className="display text-[1.35rem] leading-none text-ink">The best Laura</h1>
+          <span className="mono text-[10px] text-ink/55">GASTOS · SUSCRIPCIONES</span>
+        </header>
+        <main>
+          <MoneyTracker />
+        </main>
+      </div>
     </div>
   );
 }

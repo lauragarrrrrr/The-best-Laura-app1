@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: 'Control de gastos, suscripciones y pagos mensuales',
     start_url: '/',
     display: 'standalone',
-    background_color: '#1A120B',
-    theme_color: '#1A120B',
+    background_color: '#BAB5AD',
+    theme_color: '#BAB5AD',
     lang: 'es',
     icons: [{ src: '/icon', sizes: '512x512', type: 'image/png', purpose: 'any' }],
   };

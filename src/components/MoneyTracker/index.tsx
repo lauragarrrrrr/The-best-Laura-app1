@@ -2,188 +2,61 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useHasHydrated } from '../../lib/useHasHydrated';
+import {
+  FALLBACK_CATEGORY_ID, SWATCHES, daysInMonth, detectBrand, eur, expensesForMonth, loadState, monthKey,
+  monthLong, monthShort, pad, saveState, seedData, uid,
+  type Category, type Expense, type ExpenseIcon, type MoneyState,
+} from './data';
+import { EmojiColorPicker, IconPicker, IconTile, resolveIcon } from './icons';
+
+const WEEKDAYS = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'];
 
 /* ------------------------------------------------------------------ */
-/* Tipos y constantes                                                  */
+/* Piezas pequeñas                                                     */
 /* ------------------------------------------------------------------ */
 
-type CategoryId =
-  | 'hogar'
-  | 'alimentacion'
-  | 'ocio'
-  | 'suscripciones'
-  | 'transporte'
-  | 'salud'
-  | 'compras'
-  | 'otros';
-
-type Expense = {
-  id: string;
-  name: string;
-  amount: number;
-  category: CategoryId;
-  /** Fecha del gasto (YYYY-MM-DD). Si es recurrente, es la fecha de inicio y el día de cobro. */
-  date: string;
-  recurring: boolean;
-};
-
-type MoneyState = {
-  expenses: Expense[];
-  /** Pagos marcados como hechos: clave `${expenseId}:${YYYY-MM}` */
-  paid: Record<string, boolean>;
-};
-
-const CATEGORIES: Record<CategoryId, { label: string; color: string; icon: string }> = {
-  hogar: { label: 'Hogar', color: '#5EDCF5', icon: '🏠' },
-  alimentacion: { label: 'Alimentación', color: '#F29C38', icon: '🍴' },
-  ocio: { label: 'Ocio y viajes', color: '#F5D547', icon: '🎭' },
-  suscripciones: { label: 'Suscripciones', color: '#EE6A4D', icon: '📺' },
-  transporte: { label: 'Transporte', color: '#8B7CF6', icon: '🚗' },
-  salud: { label: 'Salud y deporte', color: '#5ED68C', icon: '💪' },
-  compras: { label: 'Compras', color: '#E066C8', icon: '🛍️' },
-  otros: { label: 'Otros', color: '#A3A3A3', icon: '📦' },
-};
-
-const CATEGORY_IDS = Object.keys(CATEGORIES) as CategoryId[];
-const STORAGE_KEY = 'tbl_money_v2';
-const WEEKDAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
-
-/* ------------------------------------------------------------------ */
-/* Utilidades de fechas y formato                                      */
-/* ------------------------------------------------------------------ */
-
-const pad = (n: number) => String(n).padStart(2, '0');
-const monthKey = (y: number, m: number) => `${y}-${pad(m + 1)}`;
-const daysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
-
-// `useGrouping: 'always'` para que 1052 se muestre como "1.052" (es-ES no agrupa 4 cifras por defecto)
-const eurFormat = new Intl.NumberFormat('es-ES', {
-  style: 'currency',
-  currency: 'EUR',
-  minimumFractionDigits: 2,
-  useGrouping: 'always',
-} as Intl.NumberFormatOptions);
-const eur = (n: number) => eurFormat.format(n);
-
-const monthLabel = (y: number, m: number) =>
-  new Date(y, m, 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
-
-function parseDate(iso: string) {
-  const [y, m, d] = iso.split('-').map(Number);
-  return { y, m: m - 1, d };
-}
-
-/** Día del mes (y, m) en que cae el gasto, o null si no aplica ese mes. */
-function dayInMonth(e: Expense, y: number, m: number): number | null {
-  const start = parseDate(e.date);
-  if (!e.recurring) return start.y === y && start.m === m ? start.d : null;
-  if (y * 12 + m < start.y * 12 + start.m) return null;
-  return Math.min(start.d, daysInMonth(y, m));
-}
-
-function expensesForMonth(expenses: Expense[], y: number, m: number) {
-  return expenses
-    .map((e) => ({ e, day: dayInMonth(e, y, m) }))
-    .filter((x): x is { e: Expense; day: number } => x.day !== null)
-    .sort((a, b) => a.day - b.day);
-}
-
-const uid = () => Math.random().toString(36).slice(2, 10);
-
-/** Color estable a partir del nombre, para los "logos" de las suscripciones. */
-function colorFromName(name: string) {
-  let h = 0;
-  for (const c of name) h = (h * 31 + c.charCodeAt(0)) % 360;
-  return `hsl(${h} 65% 55%)`;
-}
-
-/** Datos de ejemplo realistas: 3 meses de historial relativos a hoy. */
-function seedData(): MoneyState {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const iso = (date: Date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-  const daysAgo = (n: number) => iso(new Date(today.getFullYear(), today.getMonth(), today.getDate() - n));
-  const startOfRecurring = (day: number) => iso(new Date(today.getFullYear(), today.getMonth() - 3, day));
-
-  const recurring: [string, number, CategoryId, number][] = [
-    ['Alquiler', 650, 'hogar', 1],
-    ['Luz', 45.3, 'hogar', 3],
-    ['Netflix', 13.99, 'suscripciones', 5],
-    ['DIGI', 20, 'hogar', 7],
-    ['Spotify', 11.99, 'suscripciones', 10],
-    ['Disney+', 9.99, 'suscripciones', 11],
-    ['Gimnasio', 39.9, 'salud', 12],
-    ['iCloud', 2.99, 'suscripciones', 19],
-    ['Seguro del coche', 32.5, 'transporte', 22],
-  ];
-
-  // [concepto, importe, categoría, hace cuántos días]
-  const oneOff: [string, number, CategoryId, number][] = [
-    ['Mercadona', 64.2, 'alimentacion', 1],
-    ['Brunch', 24.5, 'ocio', 2],
-    ['Gasolina', 55, 'transporte', 4],
-    ['Lidl', 41.75, 'alimentacion', 6],
-    ['Zara', 49.95, 'compras', 8],
-    ['Cine', 17, 'ocio', 10],
-    ['Mercadona', 78.4, 'alimentacion', 13],
-    ['Farmacia', 12.6, 'salud', 15],
-    ['Cena con amigas', 38, 'ocio', 18],
-    ['Frutería', 18.3, 'alimentacion', 20],
-    ['Mercadona', 82.1, 'alimentacion', 24],
-    ['Gasolina', 52, 'transporte', 27],
-    ['Escapada a Valencia', 186, 'ocio', 31],
-    ['Mercadona', 71.35, 'alimentacion', 34],
-    ['Amazon', 34.99, 'compras', 37],
-    ['Lidl', 39.9, 'alimentacion', 41],
-    ['Concierto', 45, 'ocio', 44],
-    ['Mercadona', 88.6, 'alimentacion', 48],
-    ['Gasolina', 58, 'transporte', 52],
-    ['Mercadona', 69.8, 'alimentacion', 55],
-    ['Regalo cumpleaños', 40, 'compras', 58],
-    ['Cena', 32, 'ocio', 62],
-    ['Mercadona', 75.2, 'alimentacion', 66],
-    ['Fisioterapeuta', 45, 'salud', 70],
-  ];
-
-  const expenses: Expense[] = [
-    ...recurring.map(([name, amount, category, day]) => ({
-      id: uid(), name, amount, category, date: startOfRecurring(day), recurring: true,
-    })),
-    ...oneOff.map(([name, amount, category, ago]) => ({
-      id: uid(), name, amount, category, date: daysAgo(ago), recurring: false,
-    })),
-  ];
-
-  // Los recibos ya pasados aparecen como pagados; los que están por venir, pendientes.
-  const paid: Record<string, boolean> = {};
-  for (const e of expenses.filter((x) => x.recurring)) {
-    for (let back = 0; back <= 3; back++) {
-      const y = today.getFullYear();
-      const m = today.getMonth() - back;
-      const ref = new Date(y, m, 1);
-      const day = dayInMonth(e, ref.getFullYear(), ref.getMonth());
-      if (day === null) continue;
-      if (new Date(ref.getFullYear(), ref.getMonth(), day) < today || (back === 0 && day === today.getDate())) {
-        paid[`${e.id}:${monthKey(ref.getFullYear(), ref.getMonth())}`] = true;
-      }
-    }
-  }
-  return { expenses, paid };
-}
-
-/* ------------------------------------------------------------------ */
-/* Subcomponentes                                                      */
-/* ------------------------------------------------------------------ */
-
-function Avatar({ name, size = 28 }: { name: string; size?: number }) {
+function CheckMark({ size = 14, color = 'currentColor' }: { size?: number; color?: string }) {
   return (
-    <span
-      className="inline-flex items-center justify-center rounded-full font-black text-white shrink-0"
-      style={{ width: size, height: size, background: colorFromName(name), fontSize: size * 0.42 }}
-      title={name}
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke={color} strokeWidth={3.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4.5 12.5l5 5L19.5 7" />
+    </svg>
+  );
+}
+
+/** Botón de "pagado" táctil: cuadrado hundido cuando está marcado. */
+function PaidToggle({ paid, onClick, label }: { paid: boolean; onClick: () => void; label: string }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={paid}
+      aria-label={label}
+      className={`w-10 h-10 rounded-[13px] flex items-center justify-center shrink-0 transition-all duration-150 ${
+        paid
+          ? 'bg-ink text-paper shadow-[inset_0_2px_0_rgba(255,255,255,0.12)] translate-y-[1px]'
+          : 'bg-paper border-2 border-ink/80 shadow-[0_3px_0_rgba(17,17,17,0.85)] hover:-translate-y-[1px] active:translate-y-[2px] active:shadow-none'
+      }`}
     >
-      {name.trim().charAt(0).toUpperCase()}
-    </span>
+      {paid && <CheckMark size={18} />}
+    </button>
+  );
+}
+
+function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/55 backdrop-blur-[2px]" onClick={onClose} role="dialog" aria-modal="true" aria-label={title}>
+      <div
+        className="sheet w-full sm:max-w-md max-h-[92%] overflow-y-auto bg-paper text-ink rounded-t-[32px] sm:rounded-[32px] p-5 space-y-4 shadow-2xl"
+        onClick={(ev) => ev.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <h3 className="display text-2xl">{title}</h3>
+          <button onClick={onClose} className="w-9 h-9 rounded-full bg-ink/8 text-xl leading-none" aria-label="Cerrar">
+            ×
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
   );
 }
 
@@ -193,59 +66,57 @@ function Donut({
   selected,
   onSelect,
 }: {
-  slices: { id: CategoryId; value: number }[];
+  slices: { cat: Category; value: number }[];
   total: number;
-  selected: CategoryId | null;
-  onSelect: (id: CategoryId | null) => void;
+  selected: string | null;
+  onSelect: (id: string | null) => void;
 }) {
-  const r = 70;
-  const stroke = 34;
+  const r = 72;
+  const stroke = 30;
   const C = 2 * Math.PI * r;
-  const gap = slices.length > 1 ? 3 : 0;
+  const gap = slices.length > 1 ? 4 : 0;
   let offset = 0;
-
-  const sel = selected ? slices.find((s) => s.id === selected) : null;
+  const sel = selected ? slices.find((s) => s.cat.id === selected) : null;
 
   return (
-    <div className="relative w-full max-w-[260px] aspect-square mx-auto">
+    <div className="relative w-full max-w-[250px] aspect-square mx-auto">
       <svg viewBox="0 0 200 200" className="w-full h-full -rotate-90">
-        <circle cx="100" cy="100" r={r} fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth={stroke} />
+        <circle cx="100" cy="100" r={r} fill="none" stroke="#262626" strokeWidth={stroke} />
         {total > 0 &&
           slices.map((s) => {
             const len = (s.value / total) * C;
             const dash = Math.max(len - gap, 0.5);
             const el = (
               <circle
-                key={s.id}
+                key={s.cat.id}
                 cx="100"
                 cy="100"
                 r={r}
                 fill="none"
-                stroke={CATEGORIES[s.id].color}
-                strokeWidth={selected === s.id ? stroke + 6 : stroke}
+                stroke={s.cat.color}
+                strokeWidth={selected === s.cat.id ? stroke + 8 : stroke}
                 strokeDasharray={`${dash} ${C - dash}`}
                 strokeDashoffset={-offset}
-                opacity={selected && selected !== s.id ? 0.3 : 1}
+                opacity={selected && selected !== s.cat.id ? 0.25 : 1}
                 className="cursor-pointer transition-all duration-300"
-                onClick={() => onSelect(selected === s.id ? null : s.id)}
+                onClick={() => onSelect(selected === s.cat.id ? null : s.cat.id)}
               />
             );
             offset += len;
             return el;
           })}
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none px-12">
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none px-14">
         {sel ? (
           <>
-            <span className="text-2xl">{CATEGORIES[sel.id].icon}</span>
-            <span className="text-xs text-foreground/60 mt-1">{CATEGORIES[sel.id].label}</span>
-            <span className="font-bold text-lg">{eur(sel.value)}</span>
-            <span className="text-xs text-accent">{Math.round((sel.value / total) * 100)}%</span>
+            <span className="text-3xl leading-none">{sel.cat.emoji}</span>
+            <span className="display text-xl text-paper mt-1">{eur(sel.value)}</span>
+            <span className="mono text-[11px] text-amber">{Math.round((sel.value / total) * 100)}% · {sel.cat.label.toUpperCase()}</span>
           </>
         ) : (
           <>
-            <span className="text-sm text-foreground/70 leading-tight">Todas las categorías</span>
-            <span className="font-bold text-lg mt-1">{eur(total)}</span>
+            <span className="mono text-[11px] text-mute">TODAS LAS CATEGORÍAS</span>
+            <span className="display text-2xl text-paper mt-1">{eur(total)}</span>
           </>
         )}
       </div>
@@ -257,21 +128,15 @@ function Donut({
 /* Componente principal                                                */
 /* ------------------------------------------------------------------ */
 
-function loadState(): MoneyState {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as MoneyState) : seedData();
-  } catch {
-    return seedData();
-  }
-}
-
 /** Solo renderiza en cliente: la fecha actual y localStorage no existen en el servidor. */
 export const MoneyTracker = () => {
   const hasHydrated = useHasHydrated();
-  if (!hasHydrated) return <div className="h-96 rounded-2xl bg-card/40 animate-pulse" />;
+  if (!hasHydrated) return <div className="h-[80vh] rounded-[32px] bg-slab/20 animate-pulse" />;
   return <MoneyTrackerInner />;
 };
+
+type EditorState = { mode: 'new' } | { mode: 'edit'; expense: Expense };
+type CategoryEditorState = { mode: 'new' } | { mode: 'edit'; category: Category };
 
 function MoneyTrackerInner() {
   const [state, setState] = useState<MoneyState>(loadState);
@@ -280,24 +145,20 @@ function MoneyTrackerInner() {
     return { y: now.getFullYear(), m: now.getMonth() };
   });
   const [view, setView] = useState<'calendario' | 'categorias'>('calendario');
-  const [selectedCat, setSelectedCat] = useState<CategoryId | null>(null);
+  const [selectedCat, setSelectedCat] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
-  const [showForm, setShowForm] = useState(false);
-  // Confirmación dentro de la página (no usamos window.confirm: algunos visores lo bloquean)
+  const [editor, setEditor] = useState<EditorState | null>(null);
+  const [catEditor, setCatEditor] = useState<CategoryEditorState | null>(null);
   const [pending, setPending] = useState<{ message: string; action: string; run: () => void } | null>(null);
 
-  // Guardado automático
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch {
-      /* almacenamiento no disponible */
-    }
-  }, [state]);
+  useEffect(() => saveState(state), [state]);
 
   const { y, m } = cursor;
   const mk = monthKey(y, m);
   const prev = m === 0 ? { y: y - 1, m: 11 } : { y, m: m - 1 };
+  const categories = state.categories;
+  const catById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
+  const catOf = (id: string) => catById.get(id) ?? catById.get(FALLBACK_CATEGORY_ID) ?? categories[0];
 
   const monthItems = useMemo(() => expensesForMonth(state.expenses, y, m), [state.expenses, y, m]);
   const total = monthItems.reduce((s, x) => s + x.e.amount, 0);
@@ -307,19 +168,22 @@ function MoneyTrackerInner() {
   );
   const change = prevTotal > 0 ? ((total - prevTotal) / prevTotal) * 100 : null;
 
+  const isPaid = (e: Expense) => !e.recurring || !!state.paid[`${e.id}:${mk}`];
   const recurringItems = monthItems.filter((x) => x.e.recurring);
-  const recurringTotal = recurringItems.reduce((s, x) => s + x.e.amount, 0);
-  const pendingTotal = recurringItems
-    .filter((x) => !state.paid[`${x.e.id}:${mk}`])
-    .reduce((s, x) => s + x.e.amount, 0);
+  const paidCount = recurringItems.filter((x) => isPaid(x.e)).length;
+  const pendingTotal = recurringItems.filter((x) => !isPaid(x.e)).reduce((s, x) => s + x.e.amount, 0);
 
   const slices = useMemo(() => {
-    const byCat = new Map<CategoryId, number>();
-    for (const { e } of monthItems) byCat.set(e.category, (byCat.get(e.category) ?? 0) + e.amount);
+    const byCat = new Map<string, number>();
+    for (const { e } of monthItems) {
+      const id = catById.has(e.category) ? e.category : FALLBACK_CATEGORY_ID;
+      byCat.set(id, (byCat.get(id) ?? 0) + e.amount);
+    }
     return [...byCat.entries()]
-      .map(([id, value]) => ({ id, value }))
+      .map(([id, value]) => ({ cat: catById.get(id)!, value }))
+      .filter((s) => s.cat)
       .sort((a, b) => b.value - a.value);
-  }, [monthItems]);
+  }, [monthItems, catById]);
 
   const byDay = useMemo(() => {
     const map = new Map<number, Expense[]>();
@@ -329,6 +193,8 @@ function MoneyTrackerInner() {
 
   const now = new Date();
   const isCurrentMonth = now.getFullYear() === y && now.getMonth() === m;
+  const monthIndex = y * 12 + m;
+  const nowIndex = now.getFullYear() * 12 + now.getMonth();
   const firstWeekday = (new Date(y, m, 1).getDay() + 6) % 7; // lunes = 0
   const nDays = daysInMonth(y, m);
 
@@ -342,39 +208,68 @@ function MoneyTrackerInner() {
   const togglePaid = (id: string) =>
     setState((s) => ({ ...s, paid: { ...s.paid, [`${id}:${mk}`]: !s.paid[`${id}:${mk}`] } }));
 
-  const removeExpense = (id: string) => {
-    const e = state.expenses.find((x) => x.id === id);
+  const saveExpense = (e: Expense) => {
+    setState((s) => {
+      const exists = s.expenses.some((x) => x.id === e.id);
+      return { ...s, expenses: exists ? s.expenses.map((x) => (x.id === e.id ? e : x)) : [...s.expenses, e] };
+    });
+    setEditor(null);
+  };
+
+  const deleteExpense = (e: Expense) =>
     setPending({
-      message: e?.recurring
+      message: e.recurring
         ? `¿Eliminar «${e.name}»? Al ser mensual, desaparece de todos los meses.`
-        : `¿Eliminar «${e?.name ?? 'este gasto'}»?`,
+        : `¿Eliminar «${e.name}»?`,
       action: 'Eliminar',
-      run: () => setState((s) => ({ ...s, expenses: s.expenses.filter((x) => x.id !== id) })),
+      run: () => {
+        setState((s) => ({ ...s, expenses: s.expenses.filter((x) => x.id !== e.id) }));
+        setEditor(null);
+      },
+    });
+
+  const saveCategory = (c: Category) => {
+    setState((s) => {
+      const exists = s.categories.some((x) => x.id === c.id);
+      return { ...s, categories: exists ? s.categories.map((x) => (x.id === c.id ? c : x)) : [...s.categories, c] };
+    });
+    setCatEditor(null);
+  };
+
+  const deleteCategory = (c: Category) => {
+    const n = state.expenses.filter((e) => e.category === c.id).length;
+    setPending({
+      message: n
+        ? `¿Eliminar «${c.label}»? Sus ${n} gastos pasarán a «Otros».`
+        : `¿Eliminar la categoría «${c.label}»?`,
+      action: 'Eliminar',
+      run: () => {
+        setState((s) => ({
+          ...s,
+          categories: s.categories.filter((x) => x.id !== c.id),
+          expenses: s.expenses.map((e) => (e.category === c.id ? { ...e, category: FALLBACK_CATEGORY_ID } : e)),
+        }));
+        setCatEditor(null);
+        setSelectedCat(null);
+      },
     });
   };
 
-  const resetData = (mode: 'demo' | 'vacio') => {
-    const msg =
-      mode === 'demo'
-        ? '¿Cargar los datos de ejemplo? Se perderán los gastos actuales.'
-        : '¿Borrar todos los gastos y empezar de cero?';
+  const resetData = (mode: 'demo' | 'vacio') =>
     setPending({
-      message: msg,
+      message:
+        mode === 'demo'
+          ? '¿Cargar los datos de ejemplo? Se perderán los gastos actuales.'
+          : '¿Borrar todos los gastos y empezar de cero? Las categorías se mantienen.',
       action: mode === 'demo' ? 'Cargar ejemplo' : 'Borrar todo',
       run: () => {
-        setState(mode === 'demo' ? seedData() : { expenses: [], paid: {} });
+        setState((s) => (mode === 'demo' ? seedData() : { expenses: [], paid: {}, categories: s.categories }));
         setSelectedDay(null);
         setSelectedCat(null);
         const today = new Date();
         setCursor({ y: today.getFullYear(), m: today.getMonth() });
       },
     });
-  };
-
-  const addExpense = (e: Omit<Expense, 'id'>) => {
-    setState((s) => ({ ...s, expenses: [...s.expenses, { ...e, id: uid() }] }));
-    setShowForm(false);
-  };
 
   const listItems =
     view === 'calendario'
@@ -382,60 +277,67 @@ function MoneyTrackerInner() {
         ? monthItems.filter((x) => x.day === selectedDay)
         : recurringItems
       : selectedCat
-        ? monthItems.filter((x) => x.e.category === selectedCat)
+        ? monthItems.filter((x) => (catById.has(x.e.category) ? x.e.category : FALLBACK_CATEGORY_ID) === selectedCat)
         : monthItems;
 
+  const relative = (day: number) => {
+    if (!isCurrentMonth) return null;
+    const diff = day - now.getDate();
+    if (diff === 0) return 'HOY';
+    if (diff === 1) return 'MAÑANA';
+    return diff > 0 ? `EN ${diff} DÍAS` : `HACE ${-diff} D`;
+  };
+
+  const listTitle =
+    view === 'calendario'
+      ? selectedDay
+        ? `${selectedDay} de ${monthLong(y, m)}`
+        : 'Pagos del mes'
+      : selectedCat
+        ? catOf(selectedCat).label
+        : 'Todos los gastos';
+
   return (
-    <div className="space-y-6">
-      {/* Cabecera: mes y total */}
-      <div className="bg-card rounded-2xl p-6 border border-accent/10">
-        <div className="flex items-center justify-between mb-4">
-          <button
-            onClick={() => moveMonth(-1)}
-            className="w-10 h-10 rounded-full bg-background/60 hover:bg-background text-accent text-xl"
-            aria-label="Mes anterior"
-          >
-            ‹
-          </button>
-          <h2 className="text-accent font-bold uppercase tracking-widest text-sm">{monthLabel(y, m)}</h2>
-          <button
-            onClick={() => moveMonth(1)}
-            className="w-10 h-10 rounded-full bg-background/60 hover:bg-background text-accent text-xl"
-            aria-label="Mes siguiente"
-          >
-            ›
-          </button>
+    <div className="space-y-6 pb-28">
+      {/* ---------- Cabecera ---------- */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-3">
+          <button onClick={() => moveMonth(-1)} className="nav-btn" aria-label="Mes anterior">‹</button>
+          <span className="mono text-sm font-medium tracking-[0.2em] text-ink">
+            {monthShort(y, m)} {y}
+          </span>
+          <button onClick={() => moveMonth(1)} className="nav-btn" aria-label="Mes siguiente">›</button>
+          <span className="flex-1 h-[2px] bg-gradient-to-r from-amber to-transparent rounded-full" aria-hidden="true" />
         </div>
-        <div className="flex items-baseline gap-3 flex-wrap">
-          <span className="text-4xl md:text-5xl font-bold tracking-tight">{eur(total)}</span>
+
+        <div>
+          <p className="display text-[clamp(3rem,15vw,4.75rem)] leading-[0.9] text-ink tabular-nums">{eur(total)}</p>
+          <p className="display text-2xl text-ink/80 mt-1">
+            gastado en {monthLong(y, m)}.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
           {change !== null && (
-            <span className={`text-sm font-semibold ${change > 0 ? 'text-[#EE6A4D]' : 'text-[#5ED68C]'}`}>
-              {change > 0 ? '↗' : '↘'} {Math.abs(change).toFixed(0)}% vs{' '}
-              {new Date(prev.y, prev.m, 1).toLocaleDateString('es-ES', { month: 'long' })}
-              {isCurrentMonth && <span className="text-foreground/40 font-normal"> · mes en curso</span>}
+            <span className={`chip ${change > 0 ? 'text-[#B3261E]' : 'text-[#1F7A4D]'}`}>
+              {change > 0 ? '↗' : '↘'} {Math.abs(change).toFixed(0)}% VS {monthShort(prev.y, prev.m)}
+              {isCurrentMonth && <span className="text-ink/45"> · EN CURSO</span>}
             </span>
           )}
+          <span className="chip">
+            PENDIENTE <b className={pendingTotal > 0 ? 'text-[#9A5B00]' : 'text-[#1F7A4D]'}>{eur(pendingTotal)}</b>
+          </span>
         </div>
-        <div className="grid grid-cols-2 gap-3 mt-5">
-          <div className="bg-background/50 rounded-xl p-3">
-            <p className="text-xs text-foreground/50">Fijos / recurrentes</p>
-            <p className="font-bold">{eur(recurringTotal)}</p>
-          </div>
-          <div className="bg-background/50 rounded-xl p-3">
-            <p className="text-xs text-foreground/50">Pendiente de pagar</p>
-            <p className={`font-bold ${pendingTotal > 0 ? 'text-[#F5D547]' : 'text-[#5ED68C]'}`}>{eur(pendingTotal)}</p>
-          </div>
-        </div>
-      </div>
+      </section>
 
-      {/* Selector de vista */}
-      <div className="flex gap-2 bg-card/30 p-1.5 rounded-xl border border-accent/10">
+      {/* ---------- Selector de vista ---------- */}
+      <div className="grid grid-cols-2 gap-1 p-1 rounded-full bg-slab shadow-[0_8px_24px_rgba(0,0,0,0.25)]">
         {(['calendario', 'categorias'] as const).map((v) => (
           <button
             key={v}
             onClick={() => setView(v)}
-            className={`flex-1 py-2.5 rounded-lg text-sm font-bold uppercase tracking-wider transition-all ${
-              view === v ? 'bg-accent text-background' : 'text-foreground/60 hover:text-accent'
+            className={`py-3 rounded-full text-sm font-extrabold transition-all ${
+              view === v ? 'bg-paper text-ink' : 'text-mute hover:text-paper'
             }`}
           >
             {v === 'calendario' ? 'Calendario' : 'Categorías'}
@@ -443,17 +345,27 @@ function MoneyTrackerInner() {
         ))}
       </div>
 
-      {/* Vista calendario */}
+      {/* ---------- Calendario ---------- */}
       {view === 'calendario' && (
-        <div className="bg-card rounded-2xl p-3 sm:p-5 border border-accent/10">
-          <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2">
+        <section className="slab p-4 sm:p-5">
+          <div className="flex items-baseline justify-between mb-1 px-1">
+            <h2 className="display text-xl text-paper">Cobros</h2>
+            <span className="mono text-xs text-paper">
+              {paidCount} / {recurringItems.length}
+            </span>
+          </div>
+          <div className="h-[3px] rounded-full bg-[#2A2A2A] mb-4 mx-1 overflow-hidden">
+            <div
+              className="h-full bg-amber rounded-full transition-all duration-500"
+              style={{ width: `${recurringItems.length ? (paidCount / recurringItems.length) * 100 : 0}%` }}
+            />
+          </div>
+          <div className="grid grid-cols-7 gap-y-2 mb-2">
             {WEEKDAYS.map((w) => (
-              <div key={w} className="text-center text-xs text-foreground/40 font-semibold">
-                {w}
-              </div>
+              <div key={w} className="mono text-center text-[10px] text-mute">{w}</div>
             ))}
           </div>
-          <div className="grid grid-cols-7 gap-1 sm:gap-2">
+          <div className="grid grid-cols-7 gap-y-2.5 justify-items-center">
             {Array.from({ length: firstWeekday }).map((_, i) => (
               <div key={`empty-${i}`} />
             ))}
@@ -461,164 +373,194 @@ function MoneyTrackerInner() {
               const items = byDay.get(day) ?? [];
               const isToday = isCurrentMonth && now.getDate() === day;
               const isSel = selectedDay === day;
+              const isPast = monthIndex < nowIndex || (isCurrentMonth && day < now.getDate());
+              const allPaid = items.length > 0 && items.every(isPaid);
+              const first = items[0];
               return (
                 <button
                   key={day}
                   onClick={() => setSelectedDay(isSel ? null : day)}
-                  className={`aspect-[3/4] sm:aspect-square rounded-lg p-1 flex flex-col items-center gap-1 transition-all border ${
-                    isSel
-                      ? 'border-accent bg-accent/10'
-                      : 'border-transparent bg-background/50 hover:bg-background'
-                  }`}
+                  className={`relative w-11 h-11 rounded-full flex items-center justify-center transition-transform active:scale-95 ${
+                    isSel ? 'ring-2 ring-paper ring-offset-2 ring-offset-slab' : ''
+                  } ${isToday && !isSel ? 'ring-2 ring-amber ring-offset-2 ring-offset-slab' : ''}`}
+                  aria-label={`${day}${items.length ? `: ${items.map((e) => e.name).join(', ')}` : ''}`}
                 >
-                  <span className={`text-xs ${isToday ? 'text-[#5ED68C] font-bold' : 'text-foreground/60'}`}>{day}</span>
-                  <div className="flex flex-wrap justify-center gap-0.5">
-                    {items.slice(0, 2).map((e) => (
-                      <Avatar key={e.id} name={e.name} size={18} />
-                    ))}
-                    {items.length > 2 && <span className="text-[10px] text-foreground/50">+{items.length - 2}</span>}
-                  </div>
+                  {first ? (
+                    <>
+                      <IconTile icon={resolveIcon(first, categories)} size={44} round />
+                      {items.length > 1 && (
+                        <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-amber text-ink mono text-[10px] font-bold flex items-center justify-center">
+                          {items.length}
+                        </span>
+                      )}
+                      {allPaid && (
+                        <span className="absolute -bottom-1 -right-1 w-[18px] h-[18px] rounded-full bg-paper text-ink flex items-center justify-center shadow">
+                          <CheckMark size={11} />
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span
+                      className={`w-full h-full rounded-full flex items-center justify-center mono text-[13px] ${
+                        isToday ? 'bg-[#1F1A10] text-amber font-bold' : isPast ? 'bg-[#232323] text-[#6E6E6E]' : 'bg-[#0B0B0B] text-[#E6E6E6]'
+                      }`}
+                    >
+                      {day}
+                    </span>
+                  )}
                 </button>
               );
             })}
           </div>
-        </div>
+        </section>
       )}
 
-      {/* Vista categorías */}
+      {/* ---------- Categorías ---------- */}
       {view === 'categorias' && (
-        <div className="bg-card rounded-2xl p-5 border border-accent/10 space-y-5">
+        <section className="slab p-5 space-y-5">
           {slices.length === 0 ? (
-            <p className="text-center text-foreground/50 py-10">Sin gastos este mes.</p>
+            <p className="text-center text-mute py-10">Sin gastos este mes.</p>
           ) : (
-            <>
-              <Donut slices={slices} total={total} selected={selectedCat} onSelect={setSelectedCat} />
-              <div className="space-y-2">
-                {slices.map((s) => {
-                  const cat = CATEGORIES[s.id];
-                  const pct = (s.value / total) * 100;
-                  return (
-                    <button
-                      key={s.id}
-                      onClick={() => setSelectedCat(selectedCat === s.id ? null : s.id)}
-                      className={`relative w-full overflow-hidden rounded-xl bg-background/60 text-left transition-all ${
-                        selectedCat === s.id ? 'ring-1 ring-accent' : ''
-                      }`}
-                    >
-                      <div className="absolute inset-y-0 left-0 opacity-20" style={{ width: `${pct}%`, background: cat.color }} />
-                      <div className="relative flex items-center gap-3 p-3">
-                        <span className="text-xl w-8 text-center">{cat.icon}</span>
-                        <div className="flex-1">
-                          <p className="font-semibold text-sm">{cat.label}</p>
-                          <p className="text-xs text-foreground/50">{pct.toFixed(0)}%</p>
-                        </div>
-                        <span className="font-semibold text-sm">{eur(s.value)}</span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </>
+            <Donut slices={slices} total={total} selected={selectedCat} onSelect={setSelectedCat} />
           )}
-        </div>
+          <div className="space-y-2">
+            {categories.map((cat) => {
+              const value = slices.find((s) => s.cat.id === cat.id)?.value ?? 0;
+              const pct = total > 0 ? (value / total) * 100 : 0;
+              const active = selectedCat === cat.id;
+              return (
+                <div key={cat.id} className={`flex items-center gap-2 rounded-2xl transition ${active ? 'bg-[#2A2A2A]' : ''}`}>
+                  <button
+                    onClick={() => setSelectedCat(active ? null : cat.id)}
+                    className="flex-1 min-w-0 flex items-center gap-3 p-2 text-left"
+                  >
+                    <IconTile icon={{ kind: 'emoji', emoji: cat.emoji, color: cat.color }} size={40} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="font-bold text-paper text-sm truncate">{cat.label}</span>
+                        <span className="font-bold text-paper text-sm tabular-nums">{eur(value)}</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <div className="flex-1 h-[5px] rounded-full bg-[#2A2A2A] overflow-hidden">
+                          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: cat.color }} />
+                        </div>
+                        <span className="mono text-[10px] text-mute w-8 text-right">{pct.toFixed(0)}%</span>
+                      </div>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setCatEditor({ mode: 'edit', category: cat })}
+                    className="w-9 h-9 rounded-full text-mute hover:text-paper hover:bg-[#2A2A2A] shrink-0"
+                    aria-label={`Editar categoría ${cat.label}`}
+                  >
+                    ✎
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <button
+            onClick={() => setCatEditor({ mode: 'new' })}
+            className="w-full py-3 rounded-2xl border-2 border-dashed border-[#3A3A3A] text-mute hover:text-paper hover:border-mute font-bold text-sm"
+          >
+            + Nueva categoría
+          </button>
+        </section>
       )}
 
-      {/* Lista de gastos */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between px-1">
-          <h3 className="text-accent font-bold text-sm uppercase tracking-widest">
-            {view === 'calendario'
-              ? selectedDay
-                ? `Día ${selectedDay}`
-                : 'Pagos recurrentes'
-              : selectedCat
-                ? CATEGORIES[selectedCat].label
-                : 'Todos los gastos'}
-          </h3>
-          <button
-            onClick={() => setShowForm((v) => !v)}
-            className="px-4 py-2 rounded-full bg-accent text-background text-sm font-bold"
-          >
-            {showForm ? 'Cerrar' : '+ Añadir'}
-          </button>
+      {/* ---------- Lista ---------- */}
+      <section className="space-y-3">
+        <div className="flex items-baseline justify-between px-1">
+          <h2 className="display text-2xl text-ink first-letter:uppercase">{listTitle}</h2>
+          <span className="mono text-xs text-ink/60">{listItems.length} {listItems.length === 1 ? 'GASTO' : 'GASTOS'}</span>
         </div>
-
-        {showForm && (
-          <ExpenseForm
-            defaultDate={`${y}-${pad(m + 1)}-${pad(selectedDay ?? (isCurrentMonth ? now.getDate() : 1))}`}
-            defaultCategory={selectedCat ?? 'alimentacion'}
-            onSubmit={addExpense}
-          />
-        )}
 
         {listItems.length === 0 && (
-          <p className="text-center text-foreground/40 text-sm py-6">No hay gastos aquí todavía.</p>
+          <div className="glass p-6 text-center">
+            <p className="font-bold">Nada por aquí.</p>
+            <p className="text-sm text-ink/60 mt-1">Pulsa el botón amarillo para añadir un gasto.</p>
+          </div>
         )}
 
         {listItems.map(({ e, day }) => {
-          const isPaid = !e.recurring || !!state.paid[`${e.id}:${mk}`];
+          const cat = catOf(e.category);
+          const rel = relative(day);
           return (
-            <div key={e.id} className="flex items-center gap-3 bg-card rounded-xl p-3 border border-accent/5 group">
-              <Avatar name={e.name} size={36} />
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold truncate">{e.name}</p>
-                <p className="text-xs text-foreground/50">
-                  {e.recurring ? 'Mensual' : 'Puntual'} · día {day} · {CATEGORIES[e.category].label}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="font-semibold">{eur(e.amount)}</p>
-                {e.recurring ? (
-                  <button
-                    onClick={() => togglePaid(e.id)}
-                    className={`text-xs font-semibold ${isPaid ? 'text-[#5ED68C]' : 'text-[#F5D547]'}`}
-                  >
-                    {isPaid ? 'Pagado ✓' : 'Pendiente'}
-                  </button>
-                ) : (
-                  <p className="text-xs text-foreground/40">Gastado</p>
-                )}
-              </div>
-              <button
-                onClick={() => removeExpense(e.id)}
-                className="text-foreground/30 hover:text-[#EE6A4D] text-lg px-1"
-                aria-label={`Eliminar ${e.name}`}
-              >
-                ×
+            <div key={e.id} className="glass flex items-center gap-3 p-3 pr-3">
+              <button onClick={() => setEditor({ mode: 'edit', expense: e })} className="flex-1 min-w-0 flex items-center gap-3 text-left">
+                <IconTile icon={resolveIcon(e, categories)} size={46} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className="font-extrabold truncate">{e.name}</p>
+                    <p className="font-extrabold tabular-nums shrink-0">{eur(e.amount)}</p>
+                  </div>
+                  <p className="mono text-[10px] text-ink/55 truncate mt-0.5">
+                    {e.recurring ? 'MENSUAL' : 'PUNTUAL'} · {rel ?? `DÍA ${day}`} · {cat.label.toUpperCase()}
+                  </p>
+                </div>
               </button>
+              {e.recurring ? (
+                <PaidToggle
+                  paid={isPaid(e)}
+                  onClick={() => togglePaid(e.id)}
+                  label={isPaid(e) ? `Marcar ${e.name} como pendiente` : `Marcar ${e.name} como pagado`}
+                />
+              ) : (
+                <span className="w-10 h-10 rounded-[13px] bg-ink/8 flex items-center justify-center text-ink/45 shrink-0" title="Gasto puntual">
+                  <CheckMark size={16} />
+                </span>
+              )}
             </div>
           );
         })}
+      </section>
+
+      {/* ---------- Datos de la demo ---------- */}
+      <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 pt-2 mono text-[11px] text-ink/55">
+        <button onClick={() => resetData('demo')} className="hover:text-ink underline-offset-4 hover:underline">CARGAR DATOS DE EJEMPLO</button>
+        <button onClick={() => resetData('vacio')} className="hover:text-[#B3261E] underline-offset-4 hover:underline">EMPEZAR DE CERO</button>
       </div>
 
-      {/* Datos de la demo */}
-      <div className="flex flex-wrap justify-center gap-x-6 gap-y-2 pt-4 text-xs text-foreground/40">
-        <button onClick={() => resetData('demo')} className="hover:text-accent underline-offset-4 hover:underline">
-          Cargar datos de ejemplo
-        </button>
-        <button onClick={() => resetData('vacio')} className="hover:text-[#EE6A4D] underline-offset-4 hover:underline">
-          Empezar de cero
+      {/* ---------- Botón principal ---------- */}
+      <div className="fab-wrap">
+        <button onClick={() => setEditor({ mode: 'new' })} className="fab" aria-label="Añadir gasto">
+          <span className="text-4xl leading-none font-black">+</span>
         </button>
       </div>
+
+      {/* ---------- Hojas ---------- */}
+      {editor && (
+        <ExpenseSheet
+          key={editor.mode === 'edit' ? editor.expense.id : 'new'}
+          initial={editor.mode === 'edit' ? editor.expense : undefined}
+          categories={categories}
+          defaultDate={`${y}-${pad(m + 1)}-${pad(selectedDay ?? (isCurrentMonth ? now.getDate() : 1))}`}
+          defaultCategory={selectedCat ?? 'alimentacion'}
+          onSave={saveExpense}
+          onDelete={editor.mode === 'edit' ? () => deleteExpense(editor.expense) : undefined}
+          onClose={() => setEditor(null)}
+        />
+      )}
+
+      {catEditor && (
+        <CategorySheet
+          initial={catEditor.mode === 'edit' ? catEditor.category : undefined}
+          onSave={saveCategory}
+          onDelete={
+            catEditor.mode === 'edit' && catEditor.category.id !== FALLBACK_CATEGORY_ID
+              ? () => deleteCategory(catEditor.category)
+              : undefined
+          }
+          onClose={() => setCatEditor(null)}
+        />
+      )}
 
       {pending && (
-        <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-4"
-          onClick={() => setPending(null)}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div
-            className="w-full max-w-sm bg-card rounded-2xl border border-accent/20 p-5 space-y-4 shadow-2xl"
-            onClick={(ev) => ev.stopPropagation()}
-          >
-            <p className="text-sm leading-relaxed">{pending.message}</p>
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/60 p-4" onClick={() => setPending(null)} role="alertdialog" aria-modal="true">
+          <div className="w-full max-w-sm bg-paper text-ink rounded-[28px] p-5 space-y-4 shadow-2xl" onClick={(ev) => ev.stopPropagation()}>
+            <p className="font-bold leading-snug">{pending.message}</p>
             <div className="flex gap-3">
-              <button
-                onClick={() => setPending(null)}
-                className="flex-1 py-2.5 rounded-lg bg-background/60 text-foreground/80 font-semibold"
-                autoFocus
-              >
+              <button onClick={() => setPending(null)} className="flex-1 py-3 rounded-full bg-ink/8 font-bold" autoFocus>
                 Cancelar
               </button>
               <button
@@ -626,7 +568,7 @@ function MoneyTrackerInner() {
                   pending.run();
                   setPending(null);
                 }}
-                className="flex-1 py-2.5 rounded-lg bg-[#EE6A4D] text-white font-bold"
+                className="flex-1 py-3 rounded-full bg-[#D93A2E] text-white font-extrabold"
               >
                 {pending.action}
               </button>
@@ -639,68 +581,197 @@ function MoneyTrackerInner() {
 }
 
 /* ------------------------------------------------------------------ */
-/* Formulario                                                          */
+/* Hoja: añadir / editar gasto                                         */
 /* ------------------------------------------------------------------ */
 
-function ExpenseForm({
+function ExpenseSheet({
+  initial,
+  categories,
   defaultDate,
   defaultCategory,
-  onSubmit,
+  onSave,
+  onDelete,
+  onClose,
 }: {
+  initial?: Expense;
+  categories: Category[];
   defaultDate: string;
-  defaultCategory: CategoryId;
-  onSubmit: (e: Omit<Expense, 'id'>) => void;
+  defaultCategory: string;
+  onSave: (e: Expense) => void;
+  onDelete?: () => void;
+  onClose: () => void;
 }) {
-  const [name, setName] = useState('');
-  const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState<CategoryId>(defaultCategory);
-  const [date, setDate] = useState(defaultDate);
-  const [recurring, setRecurring] = useState(false);
+  const [name, setName] = useState(initial?.name ?? '');
+  const [amount, setAmount] = useState(initial ? String(initial.amount).replace('.', ',') : '');
+  const [category, setCategory] = useState(
+    initial?.category ?? (categories.some((c) => c.id === defaultCategory) ? defaultCategory : categories[0]?.id ?? FALLBACK_CATEGORY_ID),
+  );
+  const [date, setDate] = useState(initial?.date ?? defaultDate);
+  const [recurring, setRecurring] = useState(initial?.recurring ?? false);
+  const [icon, setIcon] = useState<ExpenseIcon | undefined>(initial?.icon);
+  const [showPicker, setShowPicker] = useState(false);
 
   const value = parseFloat(amount.replace(',', '.'));
   const valid = name.trim() !== '' && value > 0 && date !== '';
-
-  const inputCls =
-    'w-full bg-background border border-accent/20 rounded-lg p-2.5 text-sm focus:outline-none focus:border-accent';
+  const auto = resolveIcon({ name, category, icon: undefined }, categories);
+  const current = icon ?? auto;
+  const detected = !icon && detectBrand(name);
 
   return (
-    <form
-      onSubmit={(ev) => {
-        ev.preventDefault();
-        if (!valid) return;
-        onSubmit({ name: name.trim(), amount: Math.round(value * 100) / 100, category, date, recurring });
-      }}
-      className="bg-card rounded-xl p-4 border border-accent/20 space-y-3"
-    >
-      <div className="grid grid-cols-2 gap-3">
-        <input className={inputCls} placeholder="Concepto (ej. Netflix)" value={name} onChange={(e) => setName(e.target.value)} />
-        <input
-          className={inputCls}
-          placeholder="Importe €"
-          inputMode="decimal"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-        />
-        <select className={inputCls} value={category} onChange={(e) => setCategory(e.target.value as CategoryId)}>
-          {CATEGORY_IDS.map((id) => (
-            <option key={id} value={id}>
-              {CATEGORIES[id].icon} {CATEGORIES[id].label}
-            </option>
-          ))}
-        </select>
-        <input type="date" className={inputCls} value={date} onChange={(e) => setDate(e.target.value)} />
-      </div>
-      <label className="flex items-center gap-2 text-sm text-foreground/80 cursor-pointer">
-        <input type="checkbox" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} className="accent-[#D5CEA3]" />
-        Se repite cada mes (suscripción, recibo, alquiler…)
-      </label>
-      <button
-        type="submit"
-        disabled={!valid}
-        className="w-full py-2.5 rounded-lg bg-accent text-background font-bold disabled:opacity-40"
+    <Sheet title={initial ? 'Editar gasto' : 'Nuevo gasto'} onClose={onClose}>
+      <form
+        className="space-y-4"
+        onSubmit={(ev) => {
+          ev.preventDefault();
+          if (!valid) return;
+          onSave({
+            id: initial?.id ?? uid(),
+            name: name.trim(),
+            amount: Math.round(value * 100) / 100,
+            category,
+            date,
+            recurring,
+            ...(icon ? { icon } : {}),
+          });
+        }}
       >
-        Guardar gasto
-      </button>
-    </form>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setShowPicker((v) => !v)}
+            className="relative shrink-0 rounded-[18px] focus-visible:outline-2"
+            aria-label="Cambiar icono"
+          >
+            <IconTile icon={current} size={60} />
+            <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-ink text-paper text-xs flex items-center justify-center">✎</span>
+          </button>
+          <div className="flex-1 space-y-2">
+            <input id="expense-name" className="field w-full text-base font-bold" placeholder="Concepto (ej. Netflix)" value={name} onChange={(e) => setName(e.target.value)} autoFocus={!initial} />
+            <p className="mono text-[10px] text-ink/55">
+              {detected ? `LOGO DE ${detected.title.toUpperCase()} ✓` : 'TOCA EL ICONO PARA PERSONALIZARLO'}
+            </p>
+          </div>
+        </div>
+
+        {showPicker && (
+          <div className="rounded-3xl bg-white/60 p-3 border border-ink/10">
+            <IconPicker name={name} value={icon} fallback={auto} onChange={setIcon} />
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-3">
+          <label className="space-y-1" htmlFor="expense-amount">
+            <span className="mono text-[10px] text-ink/60">IMPORTE</span>
+            <input id="expense-amount" className="field w-full tabular-nums" placeholder="0,00 €" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          </label>
+          <label className="space-y-1" htmlFor="expense-date">
+            <span className="mono text-[10px] text-ink/60">{recurring ? 'PRIMER COBRO' : 'FECHA'}</span>
+            <input id="expense-date" type="date" className="field w-full" value={date} onChange={(e) => setDate(e.target.value)} />
+          </label>
+        </div>
+
+        <div className="space-y-1">
+          <span className="mono text-[10px] text-ink/60">CATEGORÍA</span>
+          <div className="flex flex-wrap gap-2">
+            {categories.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setCategory(c.id)}
+                className={`flex items-center gap-1.5 pl-1.5 pr-3 py-1.5 rounded-full text-xs font-bold border transition ${
+                  category === c.id ? 'bg-ink text-paper border-ink' : 'bg-white/50 border-ink/15'
+                }`}
+              >
+                <span className="w-6 h-6 rounded-full flex items-center justify-center text-sm" style={{ background: c.color }}>{c.emoji}</span>
+                {c.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setRecurring((r) => !r)}
+          className="w-full flex items-center gap-3 p-3 rounded-2xl bg-white/50 border border-ink/10 text-left"
+          aria-pressed={recurring}
+        >
+          <span className={`w-7 h-7 rounded-[9px] flex items-center justify-center ${recurring ? 'bg-ink text-paper' : 'border-2 border-ink/70'}`}>
+            {recurring && <CheckMark size={14} />}
+          </span>
+          <span className="text-sm">
+            <b>Se repite cada mes</b>
+            <span className="block text-ink/60 text-xs">Suscripciones, recibos, alquiler…</span>
+          </span>
+        </button>
+
+        <div className="flex gap-3">
+          {onDelete && (
+            <button type="button" onClick={onDelete} className="px-5 py-3.5 rounded-full bg-[#D93A2E]/10 text-[#B3261E] font-extrabold">
+              Eliminar
+            </button>
+          )}
+          <button type="submit" disabled={!valid} className="btn-3d flex-1">
+            {initial ? 'Guardar cambios' : 'Añadir gasto'}
+          </button>
+        </div>
+      </form>
+    </Sheet>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Hoja: añadir / editar categoría                                     */
+/* ------------------------------------------------------------------ */
+
+function CategorySheet({
+  initial,
+  onSave,
+  onDelete,
+  onClose,
+}: {
+  initial?: Category;
+  onSave: (c: Category) => void;
+  onDelete?: () => void;
+  onClose: () => void;
+}) {
+  const [label, setLabel] = useState(initial?.label ?? '');
+  const [emoji, setEmoji] = useState(initial?.emoji ?? '✨');
+  const [color, setColor] = useState(initial?.color ?? SWATCHES[0]);
+  const valid = label.trim() !== '';
+
+  return (
+    <Sheet title={initial ? 'Editar categoría' : 'Nueva categoría'} onClose={onClose}>
+      <form
+        className="space-y-4"
+        onSubmit={(ev) => {
+          ev.preventDefault();
+          if (!valid) return;
+          onSave({ id: initial?.id ?? `cat_${uid()}`, label: label.trim(), emoji, color });
+        }}
+      >
+        <div className="flex items-center gap-3">
+          <IconTile icon={{ kind: 'emoji', emoji, color }} size={60} />
+          <input id="category-name" className="field flex-1 text-base font-bold" placeholder="Nombre (ej. Mascotas)" value={label} onChange={(e) => setLabel(e.target.value)} autoFocus={!initial} />
+        </div>
+        <EmojiColorPicker
+          emoji={emoji}
+          color={color}
+          onChange={(em, c) => {
+            setEmoji(em);
+            setColor(c);
+          }}
+        />
+        <div className="flex gap-3">
+          {onDelete && (
+            <button type="button" onClick={onDelete} className="px-5 py-3.5 rounded-full bg-[#D93A2E]/10 text-[#B3261E] font-extrabold">
+              Eliminar
+            </button>
+          )}
+          <button type="submit" disabled={!valid} className="btn-3d flex-1">
+            {initial ? 'Guardar cambios' : 'Crear categoría'}
+          </button>
+        </div>
+      </form>
+    </Sheet>
   );
 }
