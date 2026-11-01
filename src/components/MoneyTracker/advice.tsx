@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react';
 import {
-  EMERGENCY_BUCKET_ID, detectBrand, eur, expensesForMonth, incomeFor, monthKey, monthLong, monthShort, savingsTotals,
+  EMERGENCY_BUCKET_ID, detectBrand, eur, goalStatus, expensesForMonth, incomeFor, monthKey, monthLong, monthShort, savingsTotals,
   type MoneyState,
 } from './data';
 
@@ -114,7 +114,7 @@ const BOOK_BY_ID = new Map(BOOKS.map((b) => [b.id, b]));
 /* ------------------------------------------------------------------ */
 
 type Tone = 'alerta' | 'aviso' | 'idea' | 'bien';
-export type Insight = { id: string; tone: Tone; emoji: string; title: string; text: string; book?: string; tab?: 'gastos' | 'ahorro' };
+export type Insight = { id: string; tone: Tone; emoji: string; title: string; text: string; book?: string; tab?: 'gastos' | 'ahorro' | 'objetivos' };
 
 const TONE_ORDER: Record<Tone, number> = { alerta: 0, aviso: 1, idea: 2, bien: 3 };
 const TONE_STYLE: Record<Tone, { label: string; cls: string }> = {
@@ -278,6 +278,23 @@ export function computeInsights(state: MoneyState, y: number, m: number, now = n
     });
   }
 
+  // Objetivos (viajes, compras…)
+  for (const b of state.buckets) {
+    const g = goalStatus(b, state.savings, now);
+    if (!g) continue;
+    if (g.status === 'done') {
+      out.push({ id: `goal-${b.id}`, tone: 'bien', emoji: b.emoji, tab: 'objetivos', title: `${b.label}: conseguido`, text: `Ya tienes ${eur(g.saved)} de ${eur(g.target)}.` });
+    } else if (g.status === 'behind') {
+      out.push({
+        id: `goal-${b.id}`, tone: 'aviso', emoji: b.emoji, book: 'babilonia', tab: 'objetivos',
+        title: `${b.label}: necesitas ${eur(g.perMonthNeeded)} al mes`,
+        text: `Te faltan ${eur(g.remaining)} y quedan ${g.daysLeft} días. Ahora apartas ${eur(g.monthlyPlanned)} al mes: súbelo o mueve la fecha.`,
+      });
+    } else if (g.status === 'ok') {
+      out.push({ id: `goal-${b.id}`, tone: 'bien', emoji: b.emoji, tab: 'objetivos', title: `${b.label}: vas bien`, text: `Con ${eur(g.monthlyPlanned)} al mes llegas a ${eur(g.target)} a tiempo.` });
+    }
+  }
+
   if (!state.savings.length) {
     out.push({
       id: 'first', tone: 'idea', emoji: '🐷', book: 'babilonia', tab: 'ahorro',
@@ -293,7 +310,7 @@ export function computeInsights(state: MoneyState, y: number, m: number, now = n
 /* Vista                                                               */
 /* ------------------------------------------------------------------ */
 
-export function AdviceView({ state, y, m, onGo }: { state: MoneyState; y: number; m: number; onGo: (tab: 'gastos' | 'ahorro' | 'aprende', anchor?: string) => void }) {
+export function AdviceView({ state, y, m, onGo }: { state: MoneyState; y: number; m: number; onGo: (tab: 'gastos' | 'ahorro' | 'objetivos' | 'aprende', anchor?: string) => void }) {
   const insights = useMemo(() => computeInsights(state, y, m), [state, y, m]);
   const alerts = insights.filter((i) => i.tone === 'alerta' || i.tone === 'aviso').length;
 
@@ -374,7 +391,7 @@ export function AdviceView({ state, y, m, onGo }: { state: MoneyState; y: number
                 <span className={`mono text-[10px] font-medium px-2 py-[3px] rounded-full ${tone.cls}`}>{tone.label}</span>
                 {i.tab && (
                   <button onClick={() => onGo(i.tab!)} className="ml-auto mono text-[10px] text-ink/55 underline underline-offset-2">
-                    VER EN {i.tab === 'gastos' ? 'GASTOS' : 'AHORRO'} →
+                    VER EN {i.tab.toUpperCase()} →
                   </button>
                 )}
               </div>

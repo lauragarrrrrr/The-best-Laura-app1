@@ -12,8 +12,18 @@ import { CheckMark, ConfirmDialog, Donut, GroupSheet, PaidToggle, RhythmCurve, S
 import { SavingsView } from './savings';
 import { AdviceView } from './advice';
 import { KnowledgeView } from './knowledge';
+import { HomeView } from './home';
+import { GoalsView } from './goals';
 
-type Tab = 'gastos' | 'ahorro' | 'consejos' | 'aprende';
+type Tab = 'inicio' | 'gastos' | 'ahorro' | 'objetivos' | 'consejos' | 'aprende';
+
+const SECTION_LABEL: Record<Exclude<Tab, 'inicio'>, string> = {
+  gastos: 'GASTOS',
+  ahorro: 'AHORRO',
+  objetivos: 'OBJETIVOS',
+  consejos: 'CONSEJOS',
+  aprende: 'APRENDE',
+};
 
 const WEEKDAYS = ['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'];
 
@@ -37,7 +47,7 @@ function MoneyTrackerInner() {
     const now = new Date();
     return { y: now.getFullYear(), m: now.getMonth() };
   });
-  const [tab, setTab] = useState<Tab>('gastos');
+  const [tab, setTab] = useState<Tab>('inicio');
   const [view, setView] = useState<'calendario' | 'categorias'>('calendario');
   const [selectedCat, setSelectedCat] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
@@ -211,29 +221,32 @@ function MoneyTrackerInner() {
   return (
     <div className="space-y-6 pb-32">
       <Scenes />
-      {/* ---------- Mes y secciones ---------- */}
-      <section className="space-y-4">
-        <div className="flex items-center gap-3">
-          <button onClick={() => moveMonth(-1)} className="nav-btn" aria-label="Mes anterior">‹</button>
-          <span className="mono text-sm font-medium tracking-[0.2em] text-paper">
-            {monthShort(y, m)} {y}
-          </span>
-          <button onClick={() => moveMonth(1)} className="nav-btn" aria-label="Mes siguiente">›</button>
-          <span className="flex-1 h-[2px] bg-gradient-to-r from-amber to-transparent rounded-full" aria-hidden="true" />
-        </div>
-        <Segmented<Tab>
-          options={[
-            { id: 'gastos', label: 'Gastos' },
-            { id: 'ahorro', label: 'Ahorro' },
-            { id: 'consejos', label: 'Consejos' },
-            { id: 'aprende', label: 'Aprende' },
-          ]}
-          value={tab}
-          onChange={setTab}
-        />
-      </section>
+      {/* ---------- Menú o cabecera de sección ---------- */}
+      {tab === 'inicio' ? (
+        <HomeView state={state} setState={setState} onOpen={(sec) => goTo(sec)} />
+      ) : (
+        <section className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <button onClick={() => goTo('inicio')} className="chip !py-2 !pl-2.5 !pr-3.5 hover:!bg-white/10" aria-label="Volver al menú">
+              <span aria-hidden="true">‹</span> MENÚ
+            </button>
+            <span className="page-meta">{SECTION_LABEL[tab]}</span>
+          </div>
+          {(tab === 'gastos' || tab === 'ahorro' || tab === 'consejos') && (
+            <div className="flex items-center gap-3">
+              <button onClick={() => moveMonth(-1)} className="nav-btn" aria-label="Mes anterior">‹</button>
+              <span className="mono text-sm font-medium tracking-[0.2em] text-paper">
+                {monthShort(y, m)} {y}
+              </span>
+              <button onClick={() => moveMonth(1)} className="nav-btn" aria-label="Mes siguiente">›</button>
+              <span className="flex-1 h-px bg-gradient-to-r from-amber/70 to-transparent" aria-hidden="true" />
+            </div>
+          )}
+        </section>
+      )}
 
       {tab === 'ahorro' && <SavingsView state={state} setState={setState} y={y} m={m} setPending={setPending} />}
+      {tab === 'objetivos' && <GoalsView state={state} setState={setState} setPending={setPending} />}
       {tab === 'consejos' && <AdviceView state={state} y={y} m={m} onGo={goTo} />}
       {tab === 'aprende' && <KnowledgeView state={state} setState={setState} y={y} m={m} />}
 
