@@ -14,11 +14,13 @@ import { AdviceView } from './advice';
 import { KnowledgeView } from './knowledge';
 import { HomeView } from './home';
 import { GoalsView } from './goals';
+import { BankView } from './bankView';
 
-type Tab = 'inicio' | 'gastos' | 'ahorro' | 'objetivos' | 'consejos' | 'aprende';
+type Tab = 'inicio' | 'gastos' | 'banco' | 'ahorro' | 'objetivos' | 'consejos' | 'aprende';
 
 const SECTION_LABEL: Record<Exclude<Tab, 'inicio'>, string> = {
   gastos: 'GASTOS',
+  banco: 'BANCO',
   ahorro: 'AHORRO',
   objetivos: 'OBJETIVOS',
   consejos: 'CONSEJOS',
@@ -232,7 +234,7 @@ function MoneyTrackerInner() {
             </button>
             <span className="page-meta">{SECTION_LABEL[tab]}</span>
           </div>
-          {(tab === 'gastos' || tab === 'ahorro' || tab === 'consejos') && (
+          {(tab === 'gastos' || tab === 'banco' || tab === 'ahorro' || tab === 'consejos') && (
             <div className="flex items-center gap-3">
               <button onClick={() => moveMonth(-1)} className="nav-btn" aria-label="Mes anterior">‹</button>
               <span className="mono text-sm font-medium tracking-[0.2em] text-paper">
@@ -245,6 +247,7 @@ function MoneyTrackerInner() {
         </section>
       )}
 
+      {tab === 'banco' && <BankView state={state} setState={setState} y={y} m={m} />}
       {tab === 'ahorro' && <SavingsView state={state} setState={setState} y={y} m={m} setPending={setPending} />}
       {tab === 'objetivos' && <GoalsView state={state} setState={setState} setPending={setPending} />}
       {tab === 'consejos' && <AdviceView state={state} y={y} m={m} onGo={goTo} />}

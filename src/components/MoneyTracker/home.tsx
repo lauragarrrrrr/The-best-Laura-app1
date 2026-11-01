@@ -6,7 +6,7 @@ import { computeInsights } from './advice';
 import { routeProgress } from './knowledge';
 import { CalendarSync, todayNotices } from './reminders';
 
-export type Section = 'gastos' | 'ahorro' | 'objetivos' | 'consejos' | 'aprende';
+export type Section = 'gastos' | 'banco' | 'ahorro' | 'objetivos' | 'consejos' | 'aprende';
 
 const TONE: Record<string, string> = {
   hoy: 'bg-amber text-ink',
@@ -31,13 +31,15 @@ export function HomeView({ state, setState, onOpen }: { state: MoneyState; setSt
   const insights = computeInsights(state, y, m, now);
   const alerts = insights.filter((i) => i.tone === 'alerta' || i.tone === 'aviso').length;
   const route = routeProgress(state, now);
+  const bankCount = items.filter((x) => x.e.source === 'banco').length;
 
   const tiles: { id: Section; emoji: string; title: string; stat: string; wide?: boolean }[] = [
     { id: 'gastos', emoji: '💳', title: 'Gastos', stat: `${eur(spent)} este mes · ${pendingBills ? `${pendingBills} ${pendingBills === 1 ? 'recibo' : 'recibos'} por cobrar` : 'todo pagado'}`, wide: true },
+    { id: 'banco', emoji: '🔗', title: 'Banco', stat: bankCount ? `${bankCount} movimientos este mes` : 'Importa tu extracto' },
     { id: 'ahorro', emoji: '🏦', title: 'Ahorro', stat: `${eurRound(saved)} este mes` },
     { id: 'objetivos', emoji: '🎯', title: 'Objetivos', stat: goals.length ? `${goalsDone} de ${goals.length} conseguidos` : 'Crea el primero' },
     { id: 'consejos', emoji: '💡', title: 'Consejos', stat: alerts ? `${alerts} ${alerts === 1 ? 'aviso' : 'avisos'}` : 'Todo en orden' },
-    { id: 'aprende', emoji: '📚', title: 'Aprende', stat: `Nivel ${route.done} de ${route.total}` },
+    { id: 'aprende', emoji: '📚', title: 'Aprende', stat: `Nivel ${route.done} de ${route.total}`, wide: true },
   ];
 
   return (
