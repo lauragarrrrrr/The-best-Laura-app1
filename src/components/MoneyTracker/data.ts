@@ -67,6 +67,8 @@ export type MoneyState = {
   savings: SavingEntry[];
   /** Ingresos netos por mes (`YYYY-MM`). Un mes sin valor usa el último anterior. */
   income: Record<string, number>;
+  /** Pasos de la ruta de Aprende marcados a mano */
+  checks: Record<string, boolean>;
 };
 
 /* ------------------------------------------------------------------ */
@@ -221,6 +223,14 @@ const eurFormat = new Intl.NumberFormat('es-ES', {
   useGrouping: 'always',
 } as Intl.NumberFormatOptions);
 export const eur = (n: number) => eurFormat.format(n);
+const eurRoundFormat = new Intl.NumberFormat('es-ES', {
+  style: 'currency',
+  currency: 'EUR',
+  maximumFractionDigits: 0,
+  useGrouping: 'always',
+} as Intl.NumberFormatOptions);
+/** Importe sin céntimos, para cifras grandes y estimaciones. */
+export const eurRound = (n: number) => eurRoundFormat.format(n);
 
 export const monthShort = (y: number, m: number) =>
   new Date(y, m, 1).toLocaleDateString('es-ES', { month: 'short' }).replace('.', '').toUpperCase();
@@ -361,7 +371,7 @@ export function seedData(): MoneyState {
   const incomeStart = new Date(today.getFullYear(), today.getMonth() - 3, 1);
   const income = { [monthKey(incomeStart.getFullYear(), incomeStart.getMonth())]: 1950 };
 
-  return { expenses, paid, categories: DEFAULT_CATEGORIES, buckets: DEFAULT_BUCKETS, savings, income };
+  return { expenses, paid, categories: DEFAULT_CATEGORIES, buckets: DEFAULT_BUCKETS, savings, income, checks: {} };
 }
 
 /** Solo la parte de ahorro de los datos de ejemplo. */
@@ -383,6 +393,7 @@ function normalizeState(raw: Partial<MoneyState>): MoneyState {
     buckets: raw.buckets ?? DEFAULT_BUCKETS,
     savings: raw.savings ?? [],
     income: raw.income ?? {},
+    checks: raw.checks ?? {},
   };
 }
 
