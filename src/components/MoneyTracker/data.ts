@@ -58,6 +58,14 @@ export type Expense = {
   recurring: boolean;
   /** Si no se indica, se usa el logo detectado por el nombre o el emoji de la categoría. */
   icon?: ExpenseIcon;
+  /** Importado de un extracto del banco */
+  source?: 'banco';
+  /** Huella del movimiento importado, para no duplicarlo */
+  bankKey?: string;
+  /** Comercio normalizado (MERCADONA, NETFLIX…), para aprender categorías */
+  merchant?: string;
+  /** Movimiento del banco que parece un cargo periódico (recibo, cuota…) */
+  bill?: boolean;
 };
 
 export type MoneyState = {
@@ -73,6 +81,8 @@ export type MoneyState = {
   checks: Record<string, boolean>;
   /** Recordatorios ya añadidos al calendario: clave del evento → firma de su contenido */
   calendarSynced: Record<string, string>;
+  /** Categorías aprendidas por comercio al importar del banco */
+  bankRules: Record<string, string>;
 };
 
 /* ------------------------------------------------------------------ */
@@ -415,7 +425,7 @@ export function seedData(): MoneyState {
     { id: 'viaje', label: 'Viaje de enero', emoji: '🧳', color: '#6E4430', invest: false, goal: { target: 900, date: `${tripYear}-01-20` } },
   ];
 
-  return { expenses, paid, categories: DEFAULT_CATEGORIES, buckets, savings, income, checks: {}, calendarSynced: {} };
+  return { expenses, paid, categories: DEFAULT_CATEGORIES, buckets, savings, income, checks: {}, calendarSynced: {}, bankRules: {} };
 }
 
 /** Solo la parte de ahorro de los datos de ejemplo. */
@@ -439,6 +449,7 @@ function normalizeState(raw: Partial<MoneyState>): MoneyState {
     income: raw.income ?? {},
     checks: raw.checks ?? {},
     calendarSynced: raw.calendarSynced ?? {},
+    bankRules: raw.bankRules ?? {},
   };
 }
 
