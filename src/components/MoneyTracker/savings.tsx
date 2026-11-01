@@ -113,7 +113,7 @@ export function SavingsView({ state, setState, y, m, setPending }: Props) {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {rate !== null ? (
-            <span className={`chip ${rate >= 20 ? '!text-[#8BE8B4]' : rate >= 10 ? '!text-amber' : '!text-[#FF9A8A]'}`}>
+            <span className={`chip ${rate >= 20 ? '!text-[#D8C3A0]' : rate >= 10 ? '!text-amber' : '!text-[#E3A1AB]'}`}>
               {rate.toFixed(0)}% DE TUS INGRESOS
             </span>
           ) : null}
@@ -155,7 +155,7 @@ export function SavingsView({ state, setState, y, m, setPending }: Props) {
             </div>
 
             <div className="space-y-2">
-              <div className="flex h-4 rounded-full overflow-hidden bg-[#2A2A2A]" role="img" aria-label={`${investPct.toFixed(0)}% invertido, ${(100 - investPct).toFixed(0)}% en otros ahorros`}>
+              <div className="flex h-4 rounded-full overflow-hidden bg-[#2E241D]" role="img" aria-label={`${investPct.toFixed(0)}% invertido, ${(100 - investPct).toFixed(0)}% en otros ahorros`}>
                 <div className="h-full bg-amber transition-all duration-500" style={{ width: `${investPct}%` }} />
                 <div className="h-full bg-paper/85 transition-all duration-500" style={{ width: `${monthTotal > 0 ? 100 - investPct : 0}%` }} />
               </div>
@@ -185,20 +185,20 @@ export function SavingsView({ state, setState, y, m, setPending }: Props) {
                         <span className="font-bold text-paper text-sm tabular-nums shrink-0">{eur(month)}</span>
                       </div>
                       <div className="flex items-center gap-2 mt-1.5">
-                        <div className="flex-1 h-[5px] rounded-full bg-[#2A2A2A] overflow-hidden">
+                        <div className="flex-1 h-[5px] rounded-full bg-[#2E241D] overflow-hidden">
                           <div className="h-full rounded-full" style={{ width: `${monthTotal ? (month / monthTotal) * 100 : 0}%`, background: b.color }} />
                         </div>
                         <span className="mono text-[10px] text-mute shrink-0">TOTAL {eur(total)}</span>
                       </div>
                     </div>
                   </div>
-                  <button onClick={() => setBucketEditor({ bucket: b })} className="w-9 h-9 rounded-full text-mute hover:text-paper hover:bg-[#2A2A2A] shrink-0" aria-label={`Editar ${b.label}`}>
+                  <button onClick={() => setBucketEditor({ bucket: b })} className="w-9 h-9 rounded-full text-mute hover:text-paper hover:bg-[#2E241D] shrink-0" aria-label={`Editar ${b.label}`}>
                     ✎
                   </button>
                 </div>
               ))}
             </div>
-            <button onClick={() => setBucketEditor({})} className="w-full py-3 rounded-2xl border-2 border-dashed border-[#3A3A3A] text-mute hover:text-paper hover:border-mute font-bold text-sm">
+            <button onClick={() => setBucketEditor({})} className="w-full py-3 rounded-2xl border-2 border-dashed border-[#43362C] text-mute hover:text-paper hover:border-mute font-bold text-sm">
               + Nuevo destino de ahorro
             </button>
           </section>
@@ -216,7 +216,7 @@ export function SavingsView({ state, setState, y, m, setPending }: Props) {
               {history.map((h, i) => (
                 <div key={i} className="flex flex-col items-center justify-end h-full gap-1">
                   <span className={`mono text-[9px] ${i === 5 ? 'text-paper' : 'text-mute'}`}>{h.total ? Math.round(h.total) : ''}</span>
-                  <div className="w-full max-w-[34px] flex flex-col justify-end rounded-[10px] overflow-hidden bg-[#202020]" style={{ height: `${(h.total / maxHist) * 100}%`, minHeight: 4 }}>
+                  <div className="w-full max-w-[34px] flex flex-col justify-end rounded-[10px] overflow-hidden bg-[#241C16]" style={{ height: `${(h.total / maxHist) * 100}%`, minHeight: 4 }}>
                     <div className="bg-paper/85" style={{ height: `${h.total ? (h.other / h.total) * 100 : 0}%` }} />
                     <div className="bg-amber" style={{ height: `${h.total ? (h.invest / h.total) * 100 : 0}%` }} />
                   </div>
@@ -247,11 +247,11 @@ export function SavingsView({ state, setState, y, m, setPending }: Props) {
               const future = isCurrentMonth && day > now.getDate();
               return (
                 <button key={e.id} onClick={() => setEntryEditor({ entry: e })} className="glass w-full flex items-center gap-3 p-3 text-left">
-                  <IconTile icon={{ kind: 'emoji', emoji: b?.emoji ?? '🏦', color: b?.color ?? '#4CC38A' }} size={46} />
+                  <IconTile icon={{ kind: 'emoji', emoji: b?.emoji ?? '🏦', color: b?.color ?? '#C7A27C' }} size={46} />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline justify-between gap-2">
                       <p className="font-extrabold truncate">{e.name}</p>
-                      <p className="font-extrabold tabular-nums shrink-0 text-[#1F7A4D]">+{eur(e.amount)}</p>
+                      <p className="font-extrabold tabular-nums shrink-0 text-[#7A4B2A]">+{eur(e.amount)}</p>
                     </div>
                     <p className="mono text-[10px] text-ink/55 truncate mt-0.5">
                       {e.recurring ? 'AUTOMÁTICA' : 'PUNTUAL'} · {future ? `PREVISTA DÍA ${day}` : `DÍA ${day}`} · {(b?.label ?? '').toUpperCase()}
@@ -267,7 +267,7 @@ export function SavingsView({ state, setState, y, m, setPending }: Props) {
       {/* ---------- Botón principal ---------- */}
       <div className="fab-wrap">
         <button onClick={() => setEntryEditor({})} className="fab" aria-label="Añadir aportación">
-          <span className="text-4xl leading-none font-black">+</span>
+          <span className="text-3xl leading-none font-medium">+</span>
         </button>
       </div>
 
@@ -354,7 +354,7 @@ function SavingSheet({
         }}
       >
         <div className="flex items-center gap-3">
-          <IconTile icon={{ kind: 'emoji', emoji: b?.emoji ?? '🏦', color: b?.color ?? '#4CC38A' }} size={60} />
+          <IconTile icon={{ kind: 'emoji', emoji: b?.emoji ?? '🏦', color: b?.color ?? '#C7A27C' }} size={60} />
           <input id="saving-amount" className="field flex-1 text-2xl font-black tabular-nums" placeholder="0,00 €" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus={!initial} />
         </div>
         <div className="space-y-1">
@@ -386,7 +386,7 @@ function SavingSheet({
         <ToggleRow label="Transferencia automática cada mes" hint="Págate primero: el día que cobras, sin pensarlo." value={recurring} onChange={setRecurring} />
         <div className="flex gap-3">
           {onDelete && (
-            <button type="button" onClick={onDelete} className="px-5 py-3.5 rounded-full bg-[#D93A2E]/10 text-[#B3261E] font-extrabold">
+            <button type="button" onClick={onDelete} className="px-5 py-3.5 rounded-full bg-[#7A2433]/10 text-[#7A2433] font-extrabold">
               Eliminar
             </button>
           )}

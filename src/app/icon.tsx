@@ -3,7 +3,7 @@ import { ImageResponse } from 'next/og';
 export const size = { width: 512, height: 512 };
 export const contentType = 'image/png';
 
-/** Icono de la app: símbolo del euro en ámbar sobre losa negra. */
+/** Icono de la app: símbolo del euro en mostaza sobre marrón café. */
 export default function Icon() {
   return new ImageResponse(
     (
@@ -14,8 +14,8 @@ export default function Icon() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: '#141414',
-          color: '#F5A300',
+          background: '#2A1F17',
+          color: '#D9A441',
           fontSize: 340,
           fontWeight: 800,
         }}

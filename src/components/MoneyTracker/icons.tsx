@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import {
-  BRANDS, BRANDS_BY_SLUG, EMOJI_CHOICES, SWATCHES, detectBrand, inkOn, normalize,
+  BRANDS, BRANDS_BY_SLUG, EMOJI_CHOICES, SWATCHES, detectBrand, normalize,
   type Category, type Expense, type ExpenseIcon,
 } from './data';
 
@@ -12,7 +12,7 @@ export function resolveIcon(e: Pick<Expense, 'name' | 'icon' | 'category'>, cate
   const b = detectBrand(e.name);
   if (b) return { kind: 'brand', slug: b.slug };
   const cat = categories.find((c) => c.id === e.category);
-  return { kind: 'emoji', emoji: cat?.emoji ?? '📦', color: cat?.color ?? '#9A958E' };
+  return { kind: 'emoji', emoji: cat?.emoji ?? '📦', color: cat?.color ?? '#A39B92' };
 }
 
 /** Baldosa cuadrada redondeada con el logo de la app o el emoji. */
@@ -31,11 +31,12 @@ export function IconTile({
   if (icon.kind === 'brand') {
     const b = BRANDS_BY_SLUG.get(icon.slug);
     if (b) {
-      const ink = inkOn(b.hex);
+      // Logos en monocromo (blanco roto sobre café) para que la app se vea serena
+      const ink = '#F3ECE2';
       return (
         <span
-          className={`inline-flex items-center justify-center shrink-0 ring-1 ring-white/15 ${className}`}
-          style={{ width: size, height: size, borderRadius: radius, background: b.hex }}
+          className={`inline-flex items-center justify-center shrink-0 ring-1 ring-[#F3ECE2]/12 ${className}`}
+          style={{ width: size, height: size, borderRadius: radius, background: 'linear-gradient(160deg, #3A2D24, #241B15)' }}
           title={b.title}
         >
           <svg viewBox="0 0 24 24" width={size * 0.52} height={size * 0.52} fill={ink} aria-hidden="true">
@@ -45,7 +46,7 @@ export function IconTile({
       );
     }
   }
-  const e = icon.kind === 'emoji' ? icon : { emoji: '📦', color: '#9A958E' };
+  const e = icon.kind === 'emoji' ? icon : { emoji: '📦', color: '#A39B92' };
   return (
     <span
       className={`inline-flex items-center justify-center shrink-0 ${className}`}
@@ -145,7 +146,7 @@ export function IconPicker({
 
   const q = normalize(query);
   const brands = q ? BRANDS.filter((b) => b.aliases.some((a) => normalize(a).includes(q))) : BRANDS;
-  const emojiState = current.kind === 'emoji' ? current : { emoji: '✨', color: '#F5A300' };
+  const emojiState = current.kind === 'emoji' ? current : { emoji: '✨', color: '#D9A441' };
 
   return (
     <div className="space-y-3">
